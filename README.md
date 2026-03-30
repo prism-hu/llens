@@ -122,24 +122,14 @@ uv run hf download deepseek-ai/DeepSeek-V3.2 --local-dir ./models/DeepSeek-V3.2
 ## 推論エンジンの切り替え
 
 vLLM と SGLang は `flashinfer-python` のバージョンが競合するため同居できない。
-ブランチで分離している:
-
-| ブランチ | エンジン | 起動スクリプト |
-|---|---|---|
-| `master` | vLLM | `scripts/vllm-*.sh` |
-| `sglang` | SGLang | `scripts/sglang-*.sh` |
-
-切り替え手順:
+pyproject.toml は vLLM で管理し、SGLang は手動インストールで切り替える。
 
 ```bash
-# vLLM → SGLang
-git checkout sglang
-uv sync
+# SGLang を使いたいとき
+uv pip install "sglang[all]"
+./scripts/sglang-deepseek-v3.2.sh
 
-# SGLang → vLLM
-git checkout master
+# vLLM に戻す
 uv sync
+./scripts/vllm-deepseek-v3.2.sh
 ```
-
-スクリプト・docker-compose.yml・models/ は共通。pyproject.toml と uv.lock だけが異なる。
-`sglang` は master に定期的に rebase して追従する。
