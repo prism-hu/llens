@@ -57,7 +57,7 @@ curl http://localhost:8000/v1/models
 # vLLM で直接チャット
 curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"glm-5","messages":[{"role":"user","content":"こんにちは"}]}'
+  -d '{"model":"<served-model-name>","messages":[{"role":"user","content":"こんにちは"}]}'
 
 # Open WebUI
 curl -s -o /dev/null -w '%{http_code}' http://localhost:3000
@@ -88,7 +88,7 @@ uv run hf download zai-org/GLM-5-FP8 --local-dir ./models/GLM-5-FP8
 ./scripts/vllm-glm5.sh
 ```
 
-### DeepSeek V3.2 (候補)
+### DeepSeek V3.2
 
 | 項目 | 値 |
 |---|---|
@@ -101,6 +101,14 @@ uv run hf download zai-org/GLM-5-FP8 --local-dir ./models/GLM-5-FP8
 | 最大コンテキスト | 163,840 トークン |
 | HF リポジトリ | `deepseek-ai/DeepSeek-V3.2` |
 | ライセンス | MIT |
+
+```bash
+# ダウンロード
+uv run hf download deepseek-ai/DeepSeek-V3.2 --local-dir ./models/DeepSeek-V3.2
+
+# 起動
+./scripts/vllm-deepseek-v3.2.sh
+```
 
 > DeepSeek V3.2 は GLM-5 より ~150GB 軽く、KV キャッシュに余裕がある。
 > BF16 は ~1,340GB で 8xH200 に載らない。FP8 必須。
