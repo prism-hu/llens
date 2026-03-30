@@ -12,4 +12,5 @@ dependencies = [
 [tool.uv]
 override-dependencies = [
     "transformers>=5.4.0",
+    "triton==3.4.0",
 ]
