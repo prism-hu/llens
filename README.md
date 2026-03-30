@@ -41,6 +41,27 @@ docker compose up -d
 ```
 
 ブラウザで `http://localhost:3000` にアクセス。
+初回アクセスで管理者アカウントを作成。
+
+Open WebUI から vLLM に接続:
+管理者パネル → 設定 → 接続 → OpenAI API に以下を設定:
+- URL: `http://host.docker.internal:8000/v1`
+- API Key: `EMPTY`
+
+### ヘルスチェック
+
+```bash
+# vLLM モデル一覧
+curl http://localhost:8000/v1/models
+
+# vLLM で直接チャット
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"glm-5","messages":[{"role":"user","content":"こんにちは"}]}'
+
+# Open WebUI
+curl -s -o /dev/null -w '%{http_code}' http://localhost:3000
+```
 
 ## モデル
 
