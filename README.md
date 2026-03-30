@@ -118,3 +118,28 @@ uv run hf download deepseek-ai/DeepSeek-V3.2 --local-dir ./models/DeepSeek-V3.2
 
 > DeepSeek V3.2 は GLM-5 より ~150GB 軽く、KV キャッシュに余裕がある。
 > BF16 は ~1,340GB で 8xH200 に載らない。FP8 必須。
+
+## 推論エンジンの切り替え
+
+vLLM と SGLang は `flashinfer-python` のバージョンが競合するため同居できない。
+ブランチで分離している:
+
+| ブランチ | エンジン | 起動スクリプト |
+|---|---|---|
+| `master` | vLLM | `scripts/vllm-*.sh` |
+| `sglang` | SGLang | `scripts/sglang-*.sh` |
+
+切り替え手順:
+
+```bash
+# vLLM → SGLang
+git checkout sglang
+uv sync
+
+# SGLang → vLLM
+git checkout master
+uv sync
+```
+
+スクリプト・docker-compose.yml・models/ は共通。pyproject.toml と uv.lock だけが異なる。
+`sglang` は master に定期的に rebase して追従する。

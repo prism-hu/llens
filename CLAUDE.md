@@ -16,7 +16,8 @@
 
 ## スタック
 
-- **vLLM**: uv 直接実行。コンテナ化しない。`:8000`
+- **vLLM** (master) / **SGLang** (sglang): uv 直接実行。コンテナ化しない。`:8000`
+- vLLM と SGLang は flashinfer-python が競合するため同居不可。ブランチで分離
 - **Open WebUI**: Docker で動作。`:3000`。ユーザー管理もここで行う
 - **モデル**: `models/` 配下 (gitignored)。構成は変わりうる
 
@@ -28,7 +29,8 @@
 
 ## リポジトリ構成
 
-- `scripts/vllm-*.sh` — モデルごとの vLLM 起動スクリプト。systemd の ExecStart にも使える
+- `scripts/vllm-*.sh` — モデルごとの vLLM 起動スクリプト
+- `scripts/sglang-*.sh` — モデルごとの SGLang 起動スクリプト
 - `docker-compose.yml` — Open WebUI
 - `docs/migration.md` — 本番移行メモ (systemd、専用ユーザー等)
 - モデル情報 (スペック、VRAM、起動コマンド) は README のモデルセクションに記載

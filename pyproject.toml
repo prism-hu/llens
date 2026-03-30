@@ -7,7 +7,6 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "vllm>=0.18.0",
     "transformers>=5.4.0",
-    "sglang[all]>=0.4.4",
 ]
 
 [tool.uv]
