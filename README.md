@@ -10,7 +10,7 @@
 |---|---|
 | サーバー | HGX H200 x8 (141GB HBM3e/基、計 1,128GB) |
 | OS | Ubuntu 24.04 LTS |
-| 推論エンジン | vLLM (uv 直接実行) — `:8000` |
+| 推論エンジン | vLLM or SGLang (uv 直接実行) — `:8000` |
 | Web UI | Open WebUI (Docker) — `:3000` |
 
 ## セットアップ
@@ -43,7 +43,7 @@ docker compose up -d
 ブラウザで `http://localhost:3000` にアクセス。
 初回アクセスで管理者アカウントを作成。
 
-Open WebUI から vLLM に接続:
+Open WebUI から推論サーバーに接続:
 管理者パネル → 設定 → 接続 → OpenAI API に以下を設定:
 - URL: `http://host.docker.internal:8000/v1`
 - API Key: `EMPTY`
@@ -51,10 +51,10 @@ Open WebUI から vLLM に接続:
 ### ヘルスチェック
 
 ```bash
-# vLLM モデル一覧
+# モデル一覧
 curl http://localhost:8000/v1/models
 
-# vLLM で直接チャット
+# 直接チャット
 curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"<served-model-name>","messages":[{"role":"user","content":"こんにちは"}]}'
@@ -84,8 +84,11 @@ curl -s -o /dev/null -w '%{http_code}' http://localhost:3000
 # ダウンロード
 uv run hf download zai-org/GLM-5-FP8 --local-dir ./models/GLM-5-FP8
 
-# 起動
+# 起動 (vLLM)
 ./scripts/vllm-glm5.sh
+
+# 起動 (SGLang) — MoE 最適化が強い
+./scripts/sglang-glm5.sh
 ```
 
 ### DeepSeek V3.2
@@ -106,8 +109,11 @@ uv run hf download zai-org/GLM-5-FP8 --local-dir ./models/GLM-5-FP8
 # ダウンロード
 uv run hf download deepseek-ai/DeepSeek-V3.2 --local-dir ./models/DeepSeek-V3.2
 
-# 起動
+# 起動 (vLLM)
 ./scripts/vllm-deepseek-v3.2.sh
+
+# 起動 (SGLang)
+./scripts/sglang-deepseek-v3.2.sh
 ```
 
 > DeepSeek V3.2 は GLM-5 より ~150GB 軽く、KV キャッシュに余裕がある。
