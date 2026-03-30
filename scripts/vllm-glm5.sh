@@ -7,7 +7,6 @@ exec uv run vllm serve ./models/GLM-5-FP8 \
   --max-model-len 200000 \
   --kv-cache-dtype fp8 \
   --max-num-batched-tokens 4096 \
-  --enable-prefix-caching \
   --served-model-name glm-5 \
   --host 0.0.0.0 \
   --port 8000
