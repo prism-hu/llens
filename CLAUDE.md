@@ -16,8 +16,7 @@
 
 ## スタック
 
-- **vLLM** (master) / **SGLang** (sglang): uv 直接実行。コンテナ化しない。`:8000`
-- vLLM と SGLang は flashinfer-python が競合するため同居不可。ブランチで分離
+- **SGLang**: uv 直接実行。コンテナ化しない。`:8000`
 - **Open WebUI**: Docker で動作。`:3000`。ユーザー管理もここで行う
 - **モデル**: `models/` 配下 (gitignored)。構成は変わりうる
 

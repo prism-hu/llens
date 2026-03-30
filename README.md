@@ -119,17 +119,23 @@ uv run hf download deepseek-ai/DeepSeek-V3.2 --local-dir ./models/DeepSeek-V3.2
 > DeepSeek V3.2 は GLM-5 より ~150GB 軽く、KV キャッシュに余裕がある。
 > BF16 は ~1,340GB で 8xH200 に載らない。FP8 必須。
 
-## 推論エンジンの切り替え
+### Qwen3.5
 
-vLLM と SGLang は `flashinfer-python` のバージョンが競合するため同居できない。
-pyproject.toml は vLLM で管理し、SGLang は手動インストールで切り替える。
+| 項目 | 値 |
+|---|---|
+| パラメータ | 397B (MoE、アクティブ 17B/トークン) |
+| 量子化 | FP8 |
+| モデルサイズ | ~403GB |
+| 最大コンテキスト | 262,144 トークン |
+| HF リポジトリ | `Qwen/Qwen3.5-397B-A17B-FP8` |
+| ライセンス | Apache 2.0 |
 
 ```bash
-# SGLang を使いたいとき
-uv pip install "sglang[all]"
-./scripts/sglang-deepseek-v3.2.sh
+# ダウンロード
+uv run hf download Qwen/Qwen3.5-397B-A17B-FP8 --local-dir ./models/Qwen3.5-397B-A17B-FP8
 
-# vLLM に戻す
-uv sync
-./scripts/vllm-deepseek-v3.2.sh
+# 起動 (SGLang)
+./scripts/sglang-qwen3.5.sh
 ```
+
+> DeepSeek V3.2 より更に軽量。speculative decoding (NEXTN) 対応。
