@@ -10,7 +10,7 @@ exec uv run vllm serve ./models/GLM-5-FP8 \
   --speculative-config.method mtp \
   --speculative-config.num_speculative_tokens 1 \
   --enable-prefix-caching \
-  --tool-call-parser glm47 \
+  --tool-call-parser glm45 \
   --reasoning-parser glm45 \
   --enable-auto-tool-choice \
   --served-model-name glm-5 \
