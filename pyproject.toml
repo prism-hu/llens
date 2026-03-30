@@ -5,7 +5,6 @@ description = "北大病院 H200x8 LLM 推論基盤"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "vllm>=0.18.0",
     "transformers>=5.4.0",
     "sglang[all]>=0.4.4",
 ]
