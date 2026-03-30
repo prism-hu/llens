@@ -1,7 +1,7 @@
 [project]
 name = "llens"
 version = "0.1.0"
-description = "北大病院 H200x8 LLM 推論基盤"
+description = "Large Language Enhanced Nexus System"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
