@@ -10,7 +10,8 @@ exec uv run sglang serve \
   --speculative-num-steps 3 \
   --speculative-eagle-topk 1 \
   --speculative-num-draft-tokens 4 \
-  --mem-fraction-static 0.8 \
+  --mem-fraction-static 0.90 \
+  --context-length 262144 \
   --served-model-name qwen3.5 \
   --host 0.0.0.0 \
   --port 8000
