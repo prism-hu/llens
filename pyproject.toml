@@ -6,4 +6,10 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "sglang[all]>=0.5.9",
+    "nvidia-cudnn-cu12>=9.16.0.29",
+]
+
+[tool.uv]
+override-dependencies = [
+    "nvidia-cudnn-cu12>=9.16.0.29",
 ]
