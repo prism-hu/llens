@@ -1,0 +1,321 @@
+{
+  "uid": "sglang-h200",
+  "title": "SGLang H200 Dashboard",
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "title": "--- LLM パフォーマンス ---",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "title": "TTFT (Time to First Token)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(sglang_time_to_first_token_seconds_bucket[5m]))",
+          "legendFormat": "P50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(sglang_time_to_first_token_seconds_bucket[5m]))",
+          "legendFormat": "P95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(sglang_time_to_first_token_seconds_bucket[5m]))",
+          "legendFormat": "P99"
+        }
+      ]
+    },
+    {
+      "title": "生成スループット (tokens/s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "tok/s",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sglang_gen_throughput",
+          "legendFormat": "tokens/s"
+        }
+      ]
+    },
+    {
+      "title": "同時実行 / 待ちキュー",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sglang_num_running_reqs",
+          "legendFormat": "Running"
+        },
+        {
+          "expr": "sglang_num_queue_reqs",
+          "legendFormat": "Queued"
+        }
+      ]
+    },
+    {
+      "title": "トークン処理量 (tokens/s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 9 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "tok/s",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(sglang_prompt_tokens_total[5m])",
+          "legendFormat": "Input (prompt)"
+        },
+        {
+          "expr": "rate(sglang_generation_tokens_total[5m])",
+          "legendFormat": "Output (generation)"
+        }
+      ]
+    },
+    {
+      "title": "KV キャッシュ使用トークン数",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 9 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sglang_num_used_tokens",
+          "legendFormat": "Used tokens"
+        }
+      ]
+    },
+    {
+      "title": "キャッシュヒット率",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 4, "x": 16, "y": 9 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": 0 },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "green", "value": 0.8 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sglang_cache_hit_rate",
+          "legendFormat": "Cache hit rate"
+        }
+      ]
+    },
+    {
+      "title": "リクエストレイテンシ",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 4, "x": 20, "y": 9 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(sglang_func_latency_seconds_bucket{name=\"generate_request\"}[5m]))",
+          "legendFormat": "P50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(sglang_func_latency_seconds_bucket{name=\"generate_request\"}[5m]))",
+          "legendFormat": "P95"
+        }
+      ]
+    },
+    {
+      "title": "--- GPU ハードウェア ---",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "collapsed": false
+    },
+    {
+      "title": "GPU 温度 (℃)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 18 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "thresholdsStyle": { "mode": "line" }
+          },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 75 },
+              { "color": "red", "value": 83 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "DCGM_FI_DEV_GPU_TEMP",
+          "legendFormat": "GPU {{gpu}}"
+        }
+      ]
+    },
+    {
+      "title": "GPU 使用率 (%)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 18 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "DCGM_FI_DEV_GPU_UTIL",
+          "legendFormat": "GPU {{gpu}}"
+        }
+      ]
+    },
+    {
+      "title": "VRAM 使用量 (MiB)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 18 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decmbytes",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "stacking": { "mode": "normal" }
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "DCGM_FI_DEV_FB_USED",
+          "legendFormat": "GPU {{gpu}} Used"
+        }
+      ]
+    },
+    {
+      "title": "電力消費 (W)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 26 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "DCGM_FI_DEV_POWER_USAGE",
+          "legendFormat": "GPU {{gpu}}"
+        }
+      ]
+    },
+    {
+      "title": "メモリクロック (MHz)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 26 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rotmhz",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "DCGM_FI_DEV_MEM_CLOCK",
+          "legendFormat": "GPU {{gpu}}"
+        }
+      ]
+    },
+    {
+      "title": "SM クロック (MHz)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 26 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rotmhz",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "DCGM_FI_DEV_SM_CLOCK",
+          "legendFormat": "GPU {{gpu}}"
+        }
+      ]
+    },
+    {
+      "title": "NVLink 帯域",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 34 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL",
+          "legendFormat": "GPU {{gpu}}"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "templating": { "list": [] },
+  "annotations": { "list": [] }
+}

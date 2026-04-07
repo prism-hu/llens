@@ -4,13 +4,62 @@ services:
     environment:
       - OPENAI_API_BASE_URL=http://host.docker.internal:8000/v1
       - OPENAI_API_KEY=EMPTY
+      # - ENABLE_PERSISTENT_CONFIG=false
+      - DEFAULT_PROMPT_SUGGESTIONS=[]
+      - ENABLE_FOLLOW_UP_GENERATION=false
+      - ENABLE_AUTOCOMPLETE_GENERATION=false
     volumes:
       - open-webui-data:/app/backend/data
     ports:
-      - "3000:8080"
+      - "8080:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
+  dcgm-exporter:
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.5.2-4.8.1-distroless
+    restart: unless-stopped
+    cap_add:
+      - SYS_ADMIN
+    ports:
+      - "9400:9400"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    ports:
+      - "9000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES=false
+      - GF_NEWS_NEWS_FEED_ENABLED=false
+
 volumes:
   open-webui-data:
+  prometheus_data:
+  grafana_data:

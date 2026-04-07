@@ -11,7 +11,8 @@
 | サーバー | HGX H200 x8 (141GB HBM3e/基、計 1,128GB) |
 | OS | Ubuntu 24.04 LTS |
 | 推論エンジン | vLLM or SGLang (uv 直接実行) — `:8000` |
-| Web UI | Open WebUI (Docker) — `:3000` |
+| Web UI | Open WebUI (Docker) — `:8080` |
+| 監視 | Prometheus (`:9090`) + Grafana (`:9000`) + DCGM Exporter (`:9400`) |
 
 ## セットアップ
 
@@ -34,33 +35,36 @@ uv run hf auth login
 
 モデルのダウンロード・起動は「モデル」セクション参照。
 
-### Open WebUI 起動
+### 起動手順
 
 ```bash
+# 1. SGLang 起動（モデルのダウンロード済みであること）
+./scripts/sglang-deepseek-v3.2.sh
+
+# 2. Open WebUI + 監視スタック起動（別ターミナル）
 docker compose up -d
 ```
 
-ブラウザで `http://localhost:3000` にアクセス。
-初回アクセスで管理者アカウントを作成。
+これで以下が全て立ち上がる:
 
-Open WebUI から推論サーバーに接続:
-管理者パネル → 設定 → 接続 → OpenAI API に以下を設定:
-- URL: `http://host.docker.internal:8000/v1`
-- API Key: `EMPTY`
+| サービス | URL | 用途 |
+|---|---|---|
+| SGLang | `http://localhost:8000` | 推論 API |
+| Open WebUI | `http://localhost:8080` | チャット UI |
+| Grafana | `http://localhost:9000` | 監視ダッシュボード |
+| Prometheus | `http://localhost:9090` | メトリクス収集 |
 
 ### ヘルスチェック
 
 ```bash
-# モデル一覧
+# SGLang が応答するか
 curl http://localhost:8000/v1/models
 
-# 直接チャット
-curl http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model":"<served-model-name>","messages":[{"role":"user","content":"こんにちは"}]}'
+# OpenWebUI が起動しているか
+curl -s -o /dev/null -w '%{http_code}' http://localhost:8080
 
-# Open WebUI
-curl -s -o /dev/null -w '%{http_code}' http://localhost:3000
+# 全コンテナの状態
+docker compose ps
 ```
 
 ## モデル
@@ -140,3 +144,62 @@ uv run hf download zai-org/GLM-5-FP8 --local-dir ./models/GLM-5-FP8
 ```
 
 > vLLM では 2-3 tok/s 程度しか出ない。SGLang の最適化版は Docker のみ提供で、uv 直接実行の方針と合わない。現状は採用見送り。
+
+## 監視
+
+SGLang 側は `--enable-metrics` 付きで起動する。
+
+### アクセス先
+
+| サービス | URL | 備考 |
+|---|---|---|
+| Grafana | `http://localhost:9000` | admin / admin |
+| Prometheus | `http://localhost:9090` | 通常は直接触らない |
+
+### Grafana の使い方
+
+1. `http://localhost:9000` にアクセス、admin / admin でログイン
+2. 左メニュー **Dashboards** → **SGLang H200 Dashboard** を開く
+   - 上段: LLM パフォーマンス（TTFT、スループット、キュー長、キャッシュヒット率など）
+   - 下段: GPU ハードウェア（温度、使用率、VRAM、電力、クロック、NVLink）
+3. 右上の時間範囲で表示期間を変更（デフォルト: Last 1 hour）
+4. 自動更新は 5 秒間隔
+
+### 見るべき指標と判断基準
+
+| 指標 | パネル名 | 良好 | 要注意 |
+|---|---|---|---|
+| 初回トークン応答時間 | TTFT | P95 < 1秒 | P95 > 3秒 |
+| 生成速度 | 生成スループット | > 30 tok/s | < 15 tok/s |
+| 待ち行列 | 同時実行 / 待ちキュー | Queued = 0〜数件 | 増加し続ける |
+| GPU 温度 | GPU 温度 | < 75℃ | > 83℃（スロットリング） |
+| VRAM | VRAM 使用量 | 余裕あり | 90% 超え |
+
+### データソース構成
+
+```
+SGLang (:8000/metrics) ──→ Prometheus (:9090) ──→ Grafana (:9000)
+DCGM Exporter (:9400)  ──→ Prometheus (:9090) ──↗
+```
+
+- Prometheus が 5 秒間隔で SGLang と DCGM Exporter からメトリクスを収集
+- Grafana は Prometheus をデータソースとしてグラフを描画
+- データソース・ダッシュボードは `monitoring/` 配下の設定ファイルで自動プロビジョニングされる（Grafana UI での手動設定は不要）
+
+### トラブルシュート
+
+```bash
+# 各メトリクスエンドポイントの疎通確認
+curl -s http://localhost:8000/metrics | head   # SGLang
+curl -s http://localhost:9400/metrics | head   # DCGM
+
+# Prometheus のターゲット状態確認
+# http://localhost:9090/targets にアクセスし、全ターゲットが UP であることを確認
+
+# コンテナ状態
+docker compose ps
+docker compose logs grafana
+docker compose logs prometheus
+```
+
+> SGLang v0.5.4 以降はメトリクスプレフィックスが `sglang:` → `sglang_` に変更されている。ダッシュボードは `sglang_` 前提で作成済み。バージョンが古い場合はダッシュボード JSON 内の `sglang_` を `sglang:` に置換する。

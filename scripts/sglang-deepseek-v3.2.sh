@@ -18,5 +18,6 @@ exec uv run sglang serve \
   --speculative-eagle-topk 1 \
   --speculative-num-draft-tokens 2 \
   --served-model-name deepseek-v3.2 \
+  --enable-metrics \
   --host 0.0.0.0 \
   --port 8000
