@@ -67,31 +67,7 @@ curl -s -o /dev/null -w '%{http_code}' http://localhost:3000
 
 試行・変更の可能性あり。
 
-### GLM-5 (現在のメイン)
-
-| 項目 | 値 |
-|---|---|
-| パラメータ | 744B (MoE、アクティブ 40B/トークン) |
-| 量子化 | FP8 |
-| モデルサイズ | ~756GB |
-| ロード後 VRAM | ~860GB (weights + オーバーヘッド) |
-| KV キャッシュ残量 | ~268GB (util=1.0) / ~99GB (util=0.93) |
-| KV キャッシュ/トークン | ~88KB (BF16) / ~44KB (FP8) |
-| 最大コンテキスト | 202,752 トークン |
-| HF リポジトリ | `zai-org/GLM-5-FP8` |
-
-```bash
-# ダウンロード
-uv run hf download zai-org/GLM-5-FP8 --local-dir ./models/GLM-5-FP8
-
-# 起動 (vLLM)
-./scripts/vllm-glm5.sh
-
-# 起動 (SGLang) — MoE 最適化が強い
-./scripts/sglang-glm5.sh
-```
-
-### DeepSeek V3.2
+### DeepSeek V3.2 (現在のメイン)
 
 | 項目 | 値 |
 |---|---|
@@ -116,10 +92,9 @@ uv run hf download deepseek-ai/DeepSeek-V3.2 --local-dir ./models/DeepSeek-V3.2
 ./scripts/sglang-deepseek-v3.2.sh
 ```
 
-> DeepSeek V3.2 は GLM-5 より ~150GB 軽く、KV キャッシュに余裕がある。
 > BF16 は ~1,340GB で 8xH200 に載らない。FP8 必須。
 
-### Qwen3.5
+### Qwen3.5 (予備)
 
 | 項目 | 値 |
 |---|---|
@@ -139,3 +114,29 @@ uv run hf download Qwen/Qwen3.5-397B-A17B-FP8 --local-dir ./models/Qwen3.5-397B-
 ```
 
 > DeepSeek V3.2 より更に軽量。speculative decoding (NEXTN) 対応。
+
+### GLM-5
+
+| 項目 | 値 |
+|---|---|
+| パラメータ | 744B (MoE、アクティブ 40B/トークン) |
+| 量子化 | FP8 |
+| モデルサイズ | ~756GB |
+| ロード後 VRAM | ~860GB (weights + オーバーヘッド) |
+| KV キャッシュ残量 | ~268GB (util=1.0) / ~99GB (util=0.93) |
+| KV キャッシュ/トークン | ~88KB (BF16) / ~44KB (FP8) |
+| 最大コンテキスト | 202,752 トークン |
+| HF リポジトリ | `zai-org/GLM-5-FP8` |
+
+```bash
+# ダウンロード
+uv run hf download zai-org/GLM-5-FP8 --local-dir ./models/GLM-5-FP8
+
+# 起動 (vLLM)
+./scripts/vllm-glm5.sh
+
+# 起動 (SGLang)
+./scripts/sglang-glm5.sh
+```
+
+> vLLM では 2-3 tok/s 程度しか出ない。SGLang の最適化版は Docker のみ提供で、uv 直接実行の方針と合わない。現状は採用見送り。

@@ -6,7 +6,7 @@ exec uv run sglang serve \
   --tp 8 \
   --dp 8 \
   --enable-dp-attention \
-  --mem-fraction-static 0.85 \
+  --mem-fraction-static 0.9 \
   --context-length 98304 \
   --chunked-prefill-size 16384 \
   --schedule-conservativeness 1.5 \
