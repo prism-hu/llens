@@ -202,4 +202,25 @@ docker compose logs grafana
 docker compose logs prometheus
 ```
 
-> SGLang v0.5.4 以降はメトリクスプレフィックスが `sglang:` → `sglang_` に変更されている。ダッシュボードは `sglang_` 前提で作成済み。バージョンが古い場合はダッシュボード JSON 内の `sglang_` を `sglang:` に置換する。
+### メトリクスプレフィックスについて
+
+SGLang のバージョンによりメトリクス名のプレフィックスが異なる。
+
+| バージョン | プレフィックス | 例 |
+|---|---|---|
+| 旧 (現環境) | `sglang:` (コロン) | `sglang:gen_throughput` |
+| v0.5.4 以降 | `sglang_` (アンダースコア) | `sglang_gen_throughput` |
+
+ダッシュボードは現環境の `sglang:` 前提で作成済み。SGLang をアップデートした場合は以下で一括置換する:
+
+```bash
+sed -i 's/sglang:/sglang_/g' monitoring/grafana/dashboards/sglang-h200-dashboard.json
+sudo docker compose restart grafana
+```
+
+確認方法:
+
+```bash
+curl -s http://localhost:8000/metrics | head
+# → "sglang:" で始まっていれば旧、"sglang_" なら新
+```

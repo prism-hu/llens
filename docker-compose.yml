@@ -4,8 +4,9 @@ services:
     environment:
       - OPENAI_API_BASE_URL=http://host.docker.internal:8000/v1
       - OPENAI_API_KEY=EMPTY
-      # - ENABLE_PERSISTENT_CONFIG=false
-      - DEFAULT_PROMPT_SUGGESTIONS=[]
+      - WEBUI_SHOW_UPDATE_NOTIFICATION=false
+      - ENABLE_PERSISTENT_CONFIG=false
+      - 'DEFAULT_PROMPT_SUGGESTIONS=[{"title":["はじめての方へ","LLENSの使い方"],"content":"はじめて使います。何ができるか教えてください。"}]'
       - ENABLE_FOLLOW_UP_GENERATION=false
       - ENABLE_AUTOCOMPLETE_GENERATION=false
     volumes:

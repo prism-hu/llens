@@ -27,15 +27,15 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, rate(sglang_time_to_first_token_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.50, rate(sglang:time_to_first_token_seconds_bucket[5m]))",
           "legendFormat": "P50"
         },
         {
-          "expr": "histogram_quantile(0.95, rate(sglang_time_to_first_token_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.95, rate(sglang:time_to_first_token_seconds_bucket[5m]))",
           "legendFormat": "P95"
         },
         {
-          "expr": "histogram_quantile(0.99, rate(sglang_time_to_first_token_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.99, rate(sglang:time_to_first_token_seconds_bucket[5m]))",
           "legendFormat": "P99"
         }
       ]
@@ -53,7 +53,7 @@
       },
       "targets": [
         {
-          "expr": "sglang_gen_throughput",
+          "expr": "sglang:gen_throughput",
           "legendFormat": "tokens/s"
         }
       ]
@@ -70,11 +70,11 @@
       },
       "targets": [
         {
-          "expr": "sglang_num_running_reqs",
+          "expr": "sglang:num_running_reqs",
           "legendFormat": "Running"
         },
         {
-          "expr": "sglang_num_queue_reqs",
+          "expr": "sglang:num_queue_reqs",
           "legendFormat": "Queued"
         }
       ]
@@ -92,11 +92,11 @@
       },
       "targets": [
         {
-          "expr": "rate(sglang_prompt_tokens_total[5m])",
+          "expr": "rate(sglang:prompt_tokens_total[5m])",
           "legendFormat": "Input (prompt)"
         },
         {
-          "expr": "rate(sglang_generation_tokens_total[5m])",
+          "expr": "rate(sglang:generation_tokens_total[5m])",
           "legendFormat": "Output (generation)"
         }
       ]
@@ -113,7 +113,7 @@
       },
       "targets": [
         {
-          "expr": "sglang_num_used_tokens",
+          "expr": "sglang:num_used_tokens",
           "legendFormat": "Used tokens"
         }
       ]
@@ -138,7 +138,7 @@
       },
       "targets": [
         {
-          "expr": "sglang_cache_hit_rate",
+          "expr": "sglang:cache_hit_rate",
           "legendFormat": "Cache hit rate"
         }
       ]
@@ -156,11 +156,11 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, rate(sglang_func_latency_seconds_bucket{name=\"generate_request\"}[5m]))",
+          "expr": "histogram_quantile(0.50, rate(sglang:e2e_request_latency_seconds_bucket[5m]))",
           "legendFormat": "P50"
         },
         {
-          "expr": "histogram_quantile(0.95, rate(sglang_func_latency_seconds_bucket{name=\"generate_request\"}[5m]))",
+          "expr": "histogram_quantile(0.95, rate(sglang:e2e_request_latency_seconds_bucket[5m]))",
           "legendFormat": "P95"
         }
       ]
