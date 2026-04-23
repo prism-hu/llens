@@ -1,5 +1,8 @@
 #!/bin/bash
-# Open WebUI の SQLite WAL をチェックポイント (本体に統合) する。
+# Open WebUI の SQLite WAL (Write-Ahead Log) を本体 DB に統合する。
+# Open WebUI は変更を WAL に書くため、webui.db 単体では最新状態を反映しない。
+# backup/restore スクリプトは内部で自動的にこの処理を行うが、
+# 手動で統合したい場合にこのスクリプトを使う。
 set -euo pipefail
 
 CONTAINER="${OWUI_CONTAINER:-llens-open-webui}"
