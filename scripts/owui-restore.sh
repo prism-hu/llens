@@ -47,6 +47,11 @@ fi
 
 echo "[*] Copying DB out of container"
 docker cp "${CONTAINER}:${DB_PATH_IN_CONTAINER}" "${LIVE_DB}"
+docker cp "${CONTAINER}:${DB_PATH_IN_CONTAINER}-wal" "${LIVE_DB}-wal" 2>/dev/null || true
+docker cp "${CONTAINER}:${DB_PATH_IN_CONTAINER}-shm" "${LIVE_DB}-shm" 2>/dev/null || true
+
+echo "[*] Checkpointing WAL"
+sqlite3 "${LIVE_DB}" "PRAGMA wal_checkpoint(TRUNCATE);"
 
 echo "[*] Building scratch DB from live schema"
 # Rebuild just user + auth on the scratch DB using the live schema so the
@@ -84,6 +89,9 @@ SKIPPED=$(( DUMP_USERS - INSERTED ))
 
 echo "[*] Copying merged DB back into container"
 docker cp "${LIVE_DB}" "${CONTAINER}:${DB_PATH_IN_CONTAINER}"
+: > "${WORKDIR}/empty"
+docker cp "${WORKDIR}/empty" "${CONTAINER}:${DB_PATH_IN_CONTAINER}-wal" 2>/dev/null || true
+docker cp "${WORKDIR}/empty" "${CONTAINER}:${DB_PATH_IN_CONTAINER}-shm" 2>/dev/null || true
 
 if [[ "${WAS_RUNNING}" == "true" ]]; then
   echo "[*] Starting ${CONTAINER}"

@@ -5,7 +5,9 @@ set -euo pipefail
 
 CONTAINER="${OWUI_CONTAINER:-llens-open-webui}"
 DB_PATH_IN_CONTAINER="/app/backend/data/webui.db"
-OUTDIR="${OWUI_BACKUP_DIR:-.}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+OUTDIR="${OWUI_BACKUP_DIR:-${SCRIPT_DIR}/../backups}"
+mkdir -p "${OUTDIR}"
 STAMP=$(date +%Y%m%d_%H%M%S)
 OUT="${OUTDIR}/owui-users-${STAMP}.sql"
 TMPDB=$(mktemp -t webui-backup-XXXXXX.db)
@@ -30,11 +32,16 @@ fi
 
 echo "[*] Copying DB out of container"
 docker cp "${CONTAINER}:${DB_PATH_IN_CONTAINER}" "${TMPDB}"
+docker cp "${CONTAINER}:${DB_PATH_IN_CONTAINER}-wal" "${TMPDB}-wal" 2>/dev/null || true
+docker cp "${CONTAINER}:${DB_PATH_IN_CONTAINER}-shm" "${TMPDB}-shm" 2>/dev/null || true
 
 if [[ "${WAS_RUNNING}" == "true" ]]; then
   echo "[*] Starting ${CONTAINER}"
   docker start "${CONTAINER}" >/dev/null
 fi
+
+echo "[*] Checkpointing WAL"
+sqlite3 "${TMPDB}" "PRAGMA wal_checkpoint(TRUNCATE);"
 
 echo "[*] Dumping user + auth tables → ${OUT}"
 sqlite3 "${TMPDB}" <<'SQL' > "${OUT}"
