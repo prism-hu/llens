@@ -145,6 +145,86 @@ uv run hf download zai-org/GLM-5-FP8 --local-dir ./models/GLM-5-FP8
 
 > vLLM では 2-3 tok/s 程度しか出ない。SGLang の最適化版は Docker のみ提供で、uv 直接実行の方針と合わない。現状は採用見送り。
 
+### Kimi K2.6 (検証中)
+
+| 項目 | 値 |
+|---|---|
+| パラメータ | 1.1T (MoE、アクティブ 32B/トークン) |
+| エキスパート | 384個 (ルーティング 8 + 共有 1) |
+| 量子化 | INT4 (QAT ネイティブ、compressed-tensors) |
+| モデルサイズ | ~594GB |
+| ロード後 VRAM | ~640-660GB (weights + オーバーヘッド) |
+| KV キャッシュ残量 | ~470GB (util=1.0) / ~370GB (util=0.93) |
+| KV キャッシュ/トークン | ~60-80KB (FP8 MLA、実測要確認) |
+| 最大コンテキスト | 262,144 トークン |
+| 推奨コンテキスト | 131,072 トークン (メモリ余裕確保) |
+| アテンション | MLA (Multi-head Latent Attention) |
+| マルチモーダル | 画像・動画入力対応 (MoonViT 400M encoder) |
+| HF リポジトリ | `moonshotai/Kimi-K2.6` |
+| ライセンス | Modified MIT |
+
+```bash
+# ダウンロード (~594GB、数時間かかるため深夜バッチ推奨)
+uv run hf download moonshotai/Kimi-K2.6 --local-dir ./models/Kimi-K2.6
+
+# 起動 (SGLang)
+./scripts/sglang-kimi-k2.6.sh
+```
+
+> INT4 QAT ネイティブ量子化のため BF16 比の品質劣化はほぼ無し。H200x8 で動作する 1T クラスの現実解。SGLang v0.5.10 以降が必要。
+>
+> `--dp 8 --enable-dp-attention` と `--speculative-*` は K2.6 での検証が不十分なため初回は付けない。最小構成で安定稼働を確認してから段階的に追加検討。
+>
+> DeepSeek V3.2 との並列運用は VRAM 的に不可 (切替運用)。
+
+#### Thinking / Instant モード運用
+
+K2.6 はデフォルトで Thinking モードが ON。SGLang 側は 1 インスタンスで両対応なので、Open WebUI の `Settings > Connections > OpenAI API` で同じエンドポイント (`http://localhost:8000/v1`) を 2 つ登録して使い分ける。
+
+**kimi-k2.6-instant (普段使い)**
+
+```json
+{
+  "temperature": 0.6,
+  "top_p": 0.95,
+  "extra_body": {"chat_template_kwargs": {"thinking": false}}
+}
+```
+
+**kimi-k2.6-thinking (複雑タスク用)**
+
+```json
+{
+  "temperature": 1.0,
+  "top_p": 0.95
+}
+```
+
+動作確認:
+
+```bash
+# Thinking モード
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "kimi-k2.6",
+    "messages": [{"role": "user", "content": "2+2は?"}],
+    "temperature": 1.0,
+    "top_p": 0.95
+  }'
+
+# Instant モード
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "kimi-k2.6",
+    "messages": [{"role": "user", "content": "2+2は?"}],
+    "temperature": 0.6,
+    "top_p": 0.95,
+    "chat_template_kwargs": {"thinking": false}
+  }'
+```
+
 ## 監視
 
 SGLang 側は `--enable-metrics` 付きで起動する。
@@ -204,25 +284,18 @@ docker compose logs prometheus
 
 ### メトリクスプレフィックスについて
 
-SGLang のバージョンによりメトリクス名のプレフィックスが異なる。
+現環境のメトリクス名プレフィックスは `sglang:` (コロン)。Grafana ダッシュボードもこの前提で作成済み。
 
-| バージョン | プレフィックス | 例 |
-|---|---|---|
-| 旧 (現環境) | `sglang:` (コロン) | `sglang:gen_throughput` |
-| v0.5.4 以降 | `sglang_` (アンダースコア) | `sglang_gen_throughput` |
+```bash
+curl -s http://localhost:8000/metrics | head
+# "sglang:..." で始まっていれば現行どおり
+```
 
-ダッシュボードは現環境の `sglang:` 前提で作成済み。SGLang をアップデートした場合は以下で一括置換する:
+将来 SGLang のアップデートで `sglang_` (アンダースコア) に変わる可能性があるため、アップデート後は上記で必ず確認。変わっていれば以下で一括置換:
 
 ```bash
 sed -i 's/sglang:/sglang_/g' monitoring/grafana/dashboards/sglang-h200-dashboard.json
 sudo docker compose restart grafana
-```
-
-確認方法:
-
-```bash
-curl -s http://localhost:8000/metrics | head
-# → "sglang:" で始まっていれば旧、"sglang_" なら新
 ```
 
 ## ユーザー退避・復元
