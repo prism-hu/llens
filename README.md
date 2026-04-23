@@ -224,3 +224,49 @@ sudo docker compose restart grafana
 curl -s http://localhost:8000/metrics | head
 # → "sglang:" で始まっていれば旧、"sglang_" なら新
 ```
+
+## ユーザー退避・復元
+
+Open WebUI のユーザー情報 (email + パスワードハッシュ + プロフィール) だけを外部メディアに退避・復元する仕組み。SSD ワイプを挟む運用サイクルを想定。
+
+**退避対象外**: チャット履歴、アップロードファイル、ナレッジベース、管理画面の設定。これらは再構築ごとに捨てる前提。
+
+### 想定サイクル
+
+1. インターネット環境で `docker compose up -d` → 初期ユーザー作成
+2. イントラへ物理搬入
+3. **退避**: `./scripts/owui-backup.sh` → `./backups/` に dump 生成、外部メディアへコピー
+4. SSD ワイプ
+5. インターネット経由で再構築 (`docker compose up -d`) — 同じ `:v0.9.1` が pull され schema 互換
+6. **復元**: `./scripts/owui-restore.sh ./backups/owui-users-<timestamp>.sql`
+
+復元後は JWT 鍵が変わっているため、全ユーザーは次回パスワードで再ログインが必要 (パスワード自体は bcrypt ハッシュで保持されているので通る)。
+
+### 退避
+
+```bash
+./scripts/owui-backup.sh
+```
+
+- `user` / `auth` 2 テーブルの中身を INSERT 文として `./backups/owui-users-<timestamp>.sql` に出力
+- 同名 `.sha256` も生成 (持ち出し時の整合性確認用)
+- 処理中はコンテナを一時停止 (実測数秒)
+- `./backups/` は `.gitignore` 済み
+
+### 復元
+
+```bash
+./scripts/owui-restore.sh ./backups/owui-users-<timestamp>.sql
+```
+
+- **email で衝突判定**: 復元先に同じ email があればその行はスキップ
+- `user` と `auth` はセットで挿入 (片方だけ入ることは無い)
+- 既存ユーザーは上書きしない → 搬入先で手動追加したユーザーも保護される
+- 同じ dump を何度流しても安全 (2 回目以降は全件 skip)
+
+### 制約
+
+- 退避時と復元時の Open WebUI バージョンは一致必須 (`user` / `auth` テーブルのカラム構成が変わると load 時に失敗)。`docker-compose.yml` の `:v0.9.1` ピン留めでこれを担保
+- `WEBUI_SECRET_KEY` は固定していない → 復元後に全員再ログイン必要 (alpha フェーズでは許容)
+- **ユーザー更新の反映は不可**: 外部環境で名前やロールを変更してもスクリプトは「無ければ足す、あれば触らない」挙動のため搬入先には反映されない。反映したい場合は該当ユーザーを一度削除してから復元する
+- 環境変数 `OWUI_CONTAINER` でコンテナ名を上書き可能 (旧自動生成名 `llens-open-webui-1` 期に dump したい場合など)

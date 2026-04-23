@@ -20,6 +20,7 @@ services:
 
   dcgm-exporter:
     image: nvcr.io/nvidia/k8s/dcgm-exporter:4.5.2-4.8.1-distroless
+    container_name: llens-dcgm-exporter
     restart: unless-stopped
     cap_add:
       - SYS_ADMIN
@@ -34,7 +35,8 @@ services:
               capabilities: [gpu]
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.11.2
+    container_name: llens-prometheus
     restart: unless-stopped
     ports:
       - "9090:9090"
@@ -45,7 +47,9 @@ services:
       - "host.docker.internal:host-gateway"
 
   grafana:
-    image: grafana/grafana:latest
+    # 13.0 系の patch は自動追従。minor 更新 (13.1 以降) は手動でタグを上げる。
+    image: grafana/grafana:13.0
+    container_name: llens-grafana
     restart: unless-stopped
     ports:
       - "9000:3000"
