@@ -1,0 +1,20 @@
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    enp73s0f1np1:
+      addresses:
+        - 133.87.98.75/24
+      routes:
+        - to: default
+          via: 133.87.98.1
+      nameservers:
+        addresses:
+          - 133.87.1.11
+          - 133.87.1.22
+      dhcp4: false
+      dhcp6: false
+      dhcp-identifier: "mac"
+      match:
+        macaddress:  90:5a:08:9c:e7:13 
+      optional: true
