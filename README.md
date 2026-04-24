@@ -71,6 +71,32 @@ docker compose ps
 
 試行・変更の可能性あり。
 
+### DeepSeek V4 Pro (検証中)
+
+| 項目 | 値 |
+|---|---|
+| パラメータ | 1.6T (MoE、アクティブ 49B/トークン) |
+| 量子化 | FP4 + FP8 Mixed (エキスパート FP4、その他 FP8) |
+| モデルサイズ | ~862GB |
+| ロード後 VRAM | ~900GB (推定、weights + オーバーヘッド) |
+| KV キャッシュ残量 | ~200-260GB (util=0.9、推定) |
+| 最大コンテキスト | 1,000,000 トークン (Think Max は 384K 以上推奨) |
+| アテンション | Hybrid (CSA + HCA) |
+| HF リポジトリ | `deepseek-ai/DeepSeek-V4-Pro` |
+| ライセンス | MIT |
+
+```bash
+# ダウンロード (~862GB、深夜バッチ推奨)
+uv run hf download deepseek-ai/DeepSeek-V4-Pro --local-dir ./models/DeepSeek-V4-Pro
+
+# 起動 (SGLang)
+./scripts/sglang-deepseek-v4-pro.sh
+```
+
+> 1.6T 規模のフロンティアクラスを H200x8 に押し込めるのは FP4+FP8 Mixed のおかげ。ただし GLM-5 と同様に KV キャッシュは厳しい (初期設定は context-length=128K で運用)。
+>
+> V4 は新アーキ (CSA+HCA、mHC) かつ `encoding_dsv4` による新チャットテンプレートを採用。`--reasoning-parser` / `--tool-call-parser` は V3 系と非互換の可能性が高く、SGLang 側の対応バージョンに追従して追加する。
+
 ### DeepSeek V3.2 (現在のメイン)
 
 | 項目 | 値 |
