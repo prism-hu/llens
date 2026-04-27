@@ -71,32 +71,6 @@ docker compose ps
 
 試行・変更の可能性あり。
 
-### DeepSeek V4 Pro (検証中)
-
-| 項目 | 値 |
-|---|---|
-| パラメータ | 1.6T (MoE、アクティブ 49B/トークン) |
-| 量子化 | FP4 + FP8 Mixed (エキスパート FP4、その他 FP8) |
-| モデルサイズ | ~862GB |
-| ロード後 VRAM | ~900GB (推定、weights + オーバーヘッド) |
-| KV キャッシュ残量 | ~200-260GB (util=0.9、推定) |
-| 最大コンテキスト | 1,000,000 トークン (Think Max は 384K 以上推奨) |
-| アテンション | Hybrid (CSA + HCA) |
-| HF リポジトリ | `deepseek-ai/DeepSeek-V4-Pro` |
-| ライセンス | MIT |
-
-```bash
-# ダウンロード (~862GB、深夜バッチ推奨)
-uv run hf download deepseek-ai/DeepSeek-V4-Pro --local-dir ./models/DeepSeek-V4-Pro
-
-# 起動 (SGLang)
-./scripts/sglang-deepseek-v4-pro.sh
-```
-
-> 1.6T 規模のフロンティアクラスを H200x8 に押し込めるのは FP4+FP8 Mixed のおかげ。ただし GLM-5 と同様に KV キャッシュは厳しい (初期設定は context-length=128K で運用)。
->
-> V4 は新アーキ (CSA+HCA、mHC) かつ `encoding_dsv4` による新チャットテンプレートを採用。`--reasoning-parser` / `--tool-call-parser` は V3 系と非互換の可能性が高く、SGLang 側の対応バージョンに追従して追加する。
-
 ### DeepSeek V3.2 (現在のメイン)
 
 | 項目 | 値 |
@@ -124,52 +98,6 @@ uv run hf download deepseek-ai/DeepSeek-V3.2 --local-dir ./models/DeepSeek-V3.2
 
 > BF16 は ~1,340GB で 8xH200 に載らない。FP8 必須。
 
-### Qwen3.5 (予備)
-
-| 項目 | 値 |
-|---|---|
-| パラメータ | 397B (MoE、アクティブ 17B/トークン) |
-| 量子化 | FP8 |
-| モデルサイズ | ~403GB |
-| 最大コンテキスト | 262,144 トークン |
-| HF リポジトリ | `Qwen/Qwen3.5-397B-A17B-FP8` |
-| ライセンス | Apache 2.0 |
-
-```bash
-# ダウンロード
-uv run hf download Qwen/Qwen3.5-397B-A17B-FP8 --local-dir ./models/Qwen3.5-397B-A17B-FP8
-
-# 起動 (SGLang)
-./scripts/sglang-qwen3.5.sh
-```
-
-> DeepSeek V3.2 より更に軽量。speculative decoding (NEXTN) 対応。
-
-### GLM-5
-
-| 項目 | 値 |
-|---|---|
-| パラメータ | 744B (MoE、アクティブ 40B/トークン) |
-| 量子化 | FP8 |
-| モデルサイズ | ~756GB |
-| ロード後 VRAM | ~860GB (weights + オーバーヘッド) |
-| KV キャッシュ残量 | ~268GB (util=1.0) / ~99GB (util=0.93) |
-| KV キャッシュ/トークン | ~88KB (BF16) / ~44KB (FP8) |
-| 最大コンテキスト | 202,752 トークン |
-| HF リポジトリ | `zai-org/GLM-5-FP8` |
-
-```bash
-# ダウンロード
-uv run hf download zai-org/GLM-5-FP8 --local-dir ./models/GLM-5-FP8
-
-# 起動 (vLLM)
-./scripts/vllm-glm5.sh
-
-# 起動 (SGLang)
-./scripts/sglang-glm5.sh
-```
-
-> vLLM では 2-3 tok/s 程度しか出ない。SGLang の最適化版は Docker のみ提供で、uv 直接実行の方針と合わない。現状は採用見送り。
 
 ### Kimi K2.6 (検証中)
 
@@ -250,6 +178,132 @@ curl http://localhost:8000/v1/chat/completions \
     "chat_template_kwargs": {"thinking": false}
   }'
 ```
+
+### GLM-5.1 (検証中)
+
+| 項目 | 値 |
+|---|---|
+| パラメータ | 744B (MoE、アクティブ 40B/トークン) |
+| 量子化 | FP8 (ネイティブ配布) |
+| モデルサイズ | ~756GB |
+| ロード後 VRAM | ~860GB (weights + オーバーヘッド) |
+| KV キャッシュ残量 | ~268GB (util=1.0) / ~99GB (util=0.85) |
+| KV キャッシュ/トークン | ~88KB (BF16) / ~44KB (FP8) |
+| 最大コンテキスト | 202,752 トークン |
+| アテンション | DSA (DeepSeek Sparse Attention) |
+| HF リポジトリ | `zai-org/GLM-5.1-FP8` |
+| ライセンス | MIT |
+
+```bash
+# ダウンロード (~756GB、深夜バッチ推奨)
+uv run hf download zai-org/GLM-5.1-FP8 --local-dir ./models/GLM-5.1-FP8
+
+# 起動 (SGLang)
+./scripts/sglang-glm5.1.sh
+```
+
+> SGLang v0.5.10 以降で標準サポート、Docker 不要。EAGLE/MTP speculative decoding 有効化済み。
+>
+> Thinking モードはデフォルト ON。GLM-5 系は thinking 前提で訓練されており、簡単な質問では自動的に思考を最小化、ツール使用時は interleaved thinking でツール結果を解釈しながら推論を継続する設計のため、K2.6 のような Instant/Thinking 2エンドポイント運用は不要。
+>
+> FP8 チェックポイントには pre-calibrated な KV キャッシュ scaling factor が含まれていないため、KV キャッシュは FP16 のまま運用 (reasoning-heavy タスクでの精度劣化を回避)。
+>
+> DeepSeek V3.2 / Kimi K2.6 とは VRAM 的に並列運用不可 (切替運用)。
+
+#### Thinking モード切替
+
+GLM-5.1 は thinking ON のまま運用するのが基本だが、特に軽量な処理用に thinking OFF も用意可能。Open WebUI の `Settings > Connections > OpenAI API` で同じエンドポイントを 2 つ登録して使い分け。
+
+**glm-5.1 (デフォルト、thinking ON)**
+```json
+{
+  "temperature": 1.0,
+  "top_p": 0.95
+}
+```
+
+**glm-5.1-instruct (thinking OFF、軽量処理用)**
+```json
+{
+  "temperature": 1.0,
+  "top_p": 0.95,
+  "extra_body": {"chat_template_kwargs": {"enable_thinking": false}}
+}
+```
+
+> K2.6 のキー名 `thinking` と異なり、GLM-5 系は `enable_thinking` を使う点に注意。
+
+動作確認:
+```bash
+# Thinking モード (デフォルト)
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "glm-5.1",
+    "messages": [{"role": "user", "content": "2+2は?"}],
+    "temperature": 1.0,
+    "top_p": 0.95
+  }'
+
+# Instruct モード (thinking OFF)
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "glm-5.1",
+    "messages": [{"role": "user", "content": "2+2は?"}],
+    "temperature": 1.0,
+    "top_p": 0.95,
+    "chat_template_kwargs": {"enable_thinking": false}
+  }'
+```
+
+### DeepSeek V4 Pro (要検証)
+
+| 項目 | 値 |
+|---|---|
+| パラメータ | 1.6T (MoE、アクティブ 49B/トークン) |
+| 量子化 | FP4 + FP8 Mixed (エキスパート FP4、その他 FP8) |
+| モデルサイズ | ~862GB |
+| ロード後 VRAM | ~900GB (推定、weights + オーバーヘッド) |
+| KV キャッシュ残量 | ~200-260GB (util=0.9、推定) |
+| 最大コンテキスト | 1,000,000 トークン (Think Max は 384K 以上推奨) |
+| アテンション | Hybrid (CSA + HCA) |
+| HF リポジトリ | `deepseek-ai/DeepSeek-V4-Pro` |
+| ライセンス | MIT |
+
+```bash
+# ダウンロード (~862GB、深夜バッチ推奨)
+uv run hf download deepseek-ai/DeepSeek-V4-Pro --local-dir ./models/DeepSeek-V4-Pro
+
+# 起動 (SGLang)
+./scripts/sglang-deepseek-v4-pro.sh
+```
+
+> 1.6T 規模のフロンティアクラスを H200x8 に押し込めるのは FP4+FP8 Mixed のおかげ。ただし GLM-5 と同様に KV キャッシュは厳しい (初期設定は context-length=128K で運用)。
+>
+> V4 は新アーキ (CSA+HCA、mHC) かつ `encoding_dsv4` による新チャットテンプレートを採用。`--reasoning-parser` / `--tool-call-parser` は V3 系と非互換の可能性が高く、SGLang 側の対応バージョンに追従して追加する。
+
+
+### Qwen3.5 (予備)
+
+| 項目 | 値 |
+|---|---|
+| パラメータ | 397B (MoE、アクティブ 17B/トークン) |
+| 量子化 | FP8 |
+| モデルサイズ | ~403GB |
+| 最大コンテキスト | 262,144 トークン |
+| HF リポジトリ | `Qwen/Qwen3.5-397B-A17B-FP8` |
+| ライセンス | Apache 2.0 |
+
+```bash
+# ダウンロード
+uv run hf download Qwen/Qwen3.5-397B-A17B-FP8 --local-dir ./models/Qwen3.5-397B-A17B-FP8
+
+# 起動 (SGLang)
+./scripts/sglang-qwen3.5.sh
+```
+
+> DeepSeek V3.2 より更に軽量。speculative decoding (NEXTN) 対応。
 
 ## 監視
 
