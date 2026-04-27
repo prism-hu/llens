@@ -138,7 +138,7 @@
       },
       "targets": [
         {
-          "expr": "sglang:cache_hit_rate",
+          "expr": "sum(rate(sglang:realtime_tokens_total{mode=\"prefill_cache\"}[5m])) / (sum(rate(sglang:realtime_tokens_total{mode=\"prefill_cache\"}[5m])) + sum(rate(sglang:realtime_tokens_total{mode=\"prefill_compute\"}[5m])))",
           "legendFormat": "Cache hit rate"
         }
       ]
