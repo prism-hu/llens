@@ -962,12 +962,14 @@ source = { virtual = "." }
 dependencies = [
     { name = "nvidia-cudnn-cu12" },
     { name = "sglang", extra = ["all"] },
+    { name = "transformers" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "nvidia-cudnn-cu12", specifier = ">=9.16.0.29" },
     { name = "sglang", extras = ["all"], specifier = ">=0.5.10.post1" },
+    { name = "transformers", specifier = ">=5.3.0" },
 ]
 
 [[package]]
