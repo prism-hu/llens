@@ -122,7 +122,25 @@ evals/
 uv run --group evals python evals/scripts/summarize.py evals/results/glm-5.1-think-on
 ```
 
+出力:
+- **score table**: タスクごとの精度、TTAT、think tokens
+- **timeline**: タスクごとの `started_at` / `ended_at` (ISO8601 + epoch_ms) — Grafana の時間レンジ指定に流用可能
+
 `--compare <other-dir>` で別ランとの差分(score Δ、TTAT Δ、think_tokens 比較)も出る。
+
+## Grafana との突き合わせ
+
+各タスクJSONに以下が記録される:
+
+```json
+"started_at": "2026-04-28T14:44:07+09:00",
+"ended_at": "2026-04-28T14:44:13+09:00",
+"started_epoch_ms": 1777355047398,
+"ended_epoch_ms": 1777355053624,
+"duration_sec": 6.23,
+```
+
+`*_epoch_ms` をそのまま Grafana の Time Range (`from=...&to=...`) に貼ればその時間帯のメトリクスが出る。SGLang の `:8000/metrics` (Prometheus) や DCGM exporter の GPU 利用率/温度を後追い確認できる。
 
 ## 進捗
 

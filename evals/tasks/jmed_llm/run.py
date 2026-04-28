@@ -14,11 +14,11 @@ from __future__ import annotations
 
 import argparse
 import csv
+import datetime
 import json
 import re
 import statistics
 import sys
-import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -111,6 +111,7 @@ def run_task(
 
     results: list[SampleResult] = []
     correct_count = 0
+    start_dt = datetime.datetime.now().astimezone()
 
     pbar = tqdm(rows, desc=task, unit="q")
     for i, row in enumerate(pbar):
@@ -147,7 +148,8 @@ def run_task(
         )
         pbar.set_postfix(acc=f"{correct_count / len(results):.3f}")
 
-    aggregate = aggregate_results(task, model, no_think, results)
+    end_dt = datetime.datetime.now().astimezone()
+    aggregate = aggregate_results(task, model, no_think, results, start_dt, end_dt)
     output_dir.mkdir(parents=True, exist_ok=True)
     out_path = output_dir / f"{task}.json"
     out_path.write_text(json.dumps(aggregate, ensure_ascii=False, indent=2))
@@ -169,6 +171,8 @@ def aggregate_results(
     model: str,
     no_think: bool,
     samples: list[SampleResult],
+    start_dt: datetime.datetime,
+    end_dt: datetime.datetime,
 ) -> dict[str, Any]:
     def stat(field: str) -> dict[str, float | None]:
         vals = [getattr(s, field) for s in samples]
@@ -206,8 +210,12 @@ def aggregate_results(
             "answer_tokens": stat("answer_tokens"),
         },
         "finish_reasons": _count([s.finish_reason for s in samples]),
+        "started_at": start_dt.isoformat(timespec="seconds"),
+        "ended_at": end_dt.isoformat(timespec="seconds"),
+        "started_epoch_ms": int(start_dt.timestamp() * 1000),
+        "ended_epoch_ms": int(end_dt.timestamp() * 1000),
+        "duration_sec": round((end_dt - start_dt).total_seconds(), 2),
         "samples": [asdict(s) for s in samples],
-        "generated_at": time.strftime("%Y-%m-%d %H:%M:%S %z"),
     }
 
 

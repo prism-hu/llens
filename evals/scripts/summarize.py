@@ -64,6 +64,37 @@ def get_metric(d: dict[str, Any]) -> float | None:
     return None
 
 
+def render_timeline(results: dict[str, dict[str, Any]], label: str) -> str:
+    header = f"## timeline: {label}\n\n"
+    cols = ["task", "started_at", "ended_at", "duration"]
+    lines = ["| " + " | ".join(cols) + " |",
+             "|" + "|".join(["---"] * len(cols)) + "|"]
+    rows = []
+    for task in TASK_ORDER:
+        if task not in results:
+            continue
+        d = results[task]
+        rows.append((d.get("started_epoch_ms") or 0, task, d))
+    rows.sort()
+    for _, task, d in rows:
+        dur = d.get("duration_sec")
+        if dur is None:
+            dur_s = "-"
+        elif dur >= 3600:
+            dur_s = f"{dur / 3600:.2f}h"
+        elif dur >= 60:
+            dur_s = f"{dur / 60:.1f}m"
+        else:
+            dur_s = f"{dur:.0f}s"
+        lines.append("| " + " | ".join([
+            task,
+            d.get("started_at", "-"),
+            d.get("ended_at", "-"),
+            dur_s,
+        ]) + " |")
+    return header + "\n".join(lines) + "\n"
+
+
 def render_table(results: dict[str, dict[str, Any]], label: str) -> str:
     header = f"## {label}\n\n"
     cols = [
@@ -147,11 +178,13 @@ def main() -> int:
     base = load_dir(args.input_dir)
     base_label = args.input_dir.name
     print(render_table(base, base_label))
+    print(render_timeline(base, base_label))
 
     if args.compare:
         other = load_dir(args.compare)
         other_label = args.compare.name
         print(render_table(other, other_label))
+        print(render_timeline(other, other_label))
         print(render_compare(base, other, base_label, other_label))
     return 0
 
