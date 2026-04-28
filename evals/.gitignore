@@ -1,0 +1,5 @@
+# External datasets (cloned by scripts/fetch_datasets.sh) — not checked in
+datasets/
+
+# Run outputs
+results/

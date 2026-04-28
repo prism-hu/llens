@@ -1,0 +1,102 @@
+# 評価メモ
+
+院内デプロイモデル選定のため、フロンティアOSS LLM の日本語性能を計測する。
+
+## 背景
+
+候補モデル: **GLM 5.1 / DeepSeek V3.2 / Kimi K2.6**。いずれも 1Tクラス前後のOSS。
+
+**Kimi K2.6 が本命**(動作確認済み)。ただし公式 EAGLE3 ドラフトが未公開で spec decoding を適用できず、EAGLE有効な GLM 5.1 と並べると不公平になるため、**EAGLE3 公開待ち**で計測順を後ろに置く。
+
+公開ベンチでこれらの **日本語 × 医療** スコアが揃っていない:
+
+- IgakuQA / JMED-LLM の主な公開結果は GPT-4 / Claude / Gemini / 国産ファインチューン (ELYZA-Med, Preferred-MedLLM) 中心
+- 中国系フロンティアOSSは日本側で測るインセンティブが薄く、ホストできる組織も限定的
+- H200x8 を持ち実運用前提で動かしている立場で測る価値あり
+
+院内利用前のスクリーニングが第一目的。副次的に外部公開も視野(院内データを含まない構成のため可)。
+
+## 評価方針: as-released best
+
+完全公平より **実運用想定** を優先する。
+
+- 各モデル公式推奨設定 + 公開済み高速化(EAGLEなど)を入れた状態で比較
+- 起動configは `scripts/sglang-*.sh` でgit管理して透明化
+- 設定差は明示する(例: Kimi K2.6 は公式 EAGLE3 ドラフト未公開のため spec decoding なし)
+
+## 計測項目
+
+### 速度
+
+- **TTFT** (Time To First Token): 最初のトークン出力まで
+- **TTAT** (Time To Answer Token): `</think>` 直後 = 回答開始まで。reasoning時の体感はこっち
+- **decode tok/s**: think部 / answer部 を分離計測
+- **同時並列での劣化**: 1 / 4 / 8 ユーザー時の TTAT・throughput
+
+### thinking 量
+
+- **reasoning_tokens** 中央値・p90 (per task)
+- **reasoning_tokens / answer_tokens 比**
+- **accuracy vs reasoning_tokens トレードオフ**: 同精度なら think 短い方が運用上有利
+
+SGLang の `--reasoning-parser` を介して OpenAI互換APIの `reasoning_content` / `content` および `usage.reasoning_tokens` で取得できる。lm-evaluation-harness 等のデフォルト集計には入らないので自前で拾う。
+
+### 精度(機械採点完結)
+
+| ベンチ | 内容 | 採点 |
+|---|---|---|
+| llm-jp-eval 短縮版 | JCommonsenseQA, JEMHopQA, JSQuAD, MGSM-ja 等 | accuracy / EM / F1 |
+| IgakuQA + IgakuQA119 | 医師国家試験 (2018-2022 + 第119回) | accuracy (MCQ) |
+| JMED-LLM | JMMLU-Med / MRNER / NRNER / CRADE / RRTNM / SMDIS / JCSTS | accuracy / Cohen's κ / F1 |
+
+LLM-as-a-judge は本フェーズでは使わない(機械採点で完結する範囲に限定)。
+
+## フェーズ
+
+| Phase | モデル | thinking | 備考 |
+|---|---|---|---|
+| 1 | GLM 5.1 | ON | 現行 `scripts/sglang-glm5.1.sh`、EAGLE有効 |
+| 2 | DeepSeek V3.2 | ON | spec decoding 適用可否を確認 |
+| 3 | GLM 5.1 | OFF | 同重みで `enable_thinking: false`、Phase 1との差分を見る |
+| 4 | Kimi K2.6 | ON | **本命**。公式 EAGLE3 ドラフト公開後にフェアな条件で計測 |
+
+## ディレクトリ構成
+
+```
+evals/
+├── README.md            # 再現手順
+├── configs/             # モデル × モード ごとのYAML
+├── harness/
+│   ├── client.py        # streaming + reasoning_content分離
+│   ├── speed.py         # TTFT/TTAT/tok/s/think_tokens
+│   └── accuracy.py      # 各タスクrunner
+├── tasks/
+│   ├── igakuqa/
+│   ├── jmed_llm/
+│   └── llm_jp_eval_subset/
+├── results/<model>-<mode>/
+│   ├── speed.json
+│   ├── accuracy.json
+│   └── meta.json        # config, git sha, 起動コマンド
+└── run.sh
+```
+
+依存は pyproject の `[dependency-groups]` evals に切る。`uv sync --group evals` で取得。
+
+## 設計上の注意
+
+- **chat template / prompt format** は各モデル公式に従う
+- **temperature / top_p** はタスク種別で固定: 知識QA = 0、生成系 = 0.7
+- **N=3〜5 中央値**: MoE は温度0でも揺れがある
+- **context length** は全モデル統一(128K想定、必要に応じ短縮)
+- 起動configをモデル切替時に必ずgit反映
+- 評価データのライセンスを `tasks/<name>/LICENSE.md` に明記
+
+## 後続(本ドキュメント範囲外)
+
+- **院内ガイドラインMCQ**: 医師監修で50〜100問、機械採点
+- **自院カルテ要約**: 医師による自由記述評価(N=30〜50)
+- **長文性能**: Needle-in-a-Haystack JP (64K〜128K)
+- **安全性**: PII漏洩・過剰拒否・プロンプトインジェクション
+
+これらは閉域化前後で別途追加。
