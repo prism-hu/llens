@@ -40,6 +40,8 @@ class SampleResult:
     problem_id: str
     year: str
     category: str
+    has_image: bool
+    points_possible: int
     gold: list[str]
     extracted: str
     extracted_set: list[str]
@@ -145,11 +147,17 @@ def run(
         correct = letters_found == gold_set
         if correct:
             correct_count += 1
+        try:
+            pts = int(p.get("points", 1) or 1)
+        except (ValueError, TypeError):
+            pts = 1
         results.append(
             SampleResult(
                 problem_id=p["problem_id"],
                 year=p["year"],
                 category=p.get("category", ""),
+                has_image=not p.get("text_only", True),
+                points_possible=pts,
                 gold=gold_set,
                 extracted=raw_match,
                 extracted_set=letters_found,
@@ -171,6 +179,34 @@ def run(
     out_path = output_dir / "igakuqa.json"
     out_path.write_text(json.dumps(aggregate, ensure_ascii=False, indent=2))
     return out_path
+
+
+def _bucket(samples: list[SampleResult]) -> dict[str, Any]:
+    correct = sum(s.correct for s in samples)
+    total = len(samples)
+    score = sum(s.points_possible for s in samples if s.correct)
+    possible_score = sum(s.points_possible for s in samples)
+    return {
+        "correct": correct,
+        "total": total,
+        "accuracy": (correct / total) if total else 0.0,
+        "score": score,
+        "possible_score": possible_score,
+        "score_rate": (score / possible_score) if possible_score else 0.0,
+        "score_str": f"{score}/{possible_score} ({100 * score / possible_score:.2f}%)" if possible_score else "0/0 (-)",
+        "accuracy_str": f"{correct}/{total} ({100 * correct / total:.2f}%)" if total else "0/0 (-)",
+    }
+
+
+def compute_leaderboard(samples: list[SampleResult]) -> dict[str, Any]:
+    """IgakuQA leaderboard format. Each problem already carries a `points`
+    field in the source data (typically 1, occasionally 3 for 必修問題).
+    """
+    no_image = [s for s in samples if not s.has_image]
+    return {
+        "overall": _bucket(samples),
+        "no_image": _bucket(no_image),
+    }
 
 
 def percentile(xs: list[float | None], p: float) -> float | None:
@@ -207,6 +243,8 @@ def aggregate_results(
         if s.category:
             by_category.setdefault(s.category, []).append(s.correct)
 
+    leaderboard = compute_leaderboard(samples)
+
     return {
         "task": "igakuqa",
         "model": model,
@@ -215,6 +253,11 @@ def aggregate_results(
         "n": len(samples),
         "metrics": {
             "accuracy": sum(s.correct for s in samples) / len(samples) if samples else 0.0,
+        },
+        "leaderboard": leaderboard,
+        "leaderboard_by_year": {
+            y: compute_leaderboard([s for s in samples if s.year == y])
+            for y in sorted({s.year for s in samples})
         },
         "accuracy_by_year": {
             y: {"n": len(v), "accuracy": sum(v) / len(v)} for y, v in sorted(by_year.items())

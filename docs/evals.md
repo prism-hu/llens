@@ -10,11 +10,11 @@
 
 公開ベンチでこれらの **日本語 × 医療** スコアが揃っていない:
 
-- IgakuQA / JMED-LLM の主な公開結果は GPT-4 / Claude / Gemini / 国産ファインチューン (ELYZA-Med, Preferred-MedLLM) 中心
+- IgakuQA / IgakuQA119 / JMED-LLM の主な公開結果は GPT-4 / Claude / Gemini / 国産ファインチューン (ELYZA-Med, Preferred-MedLLM, Llama3-Preferred-MedSwallow 等) 中心
 - 中国系フロンティアOSSは日本側で測るインセンティブが薄く、ホストできる組織も限定的
 - H200x8 を持ち実運用前提で動かしている立場で測る価値あり
 
-院内利用前のスクリーニングが第一目的。副次的に外部公開も視野(院内データを含まない構成のため可)。
+院内利用前のスクリーニングが第一目的。**副次的に、現状の日本語FT中心リーダーボードに対してフロンティアOSSのスコアを並べて掲載提案できる材料を作る**ことも狙い。各タスクの集計形式は対応する公式リーダーボードと同形式に揃える(IgakuQA/IgakuQA119: 500点満点制、JMED-LLM: linear weighted κ 等)。
 
 ## 評価方針: as-released best
 
@@ -41,13 +41,14 @@
 
 SGLang の `--reasoning-parser` を介して OpenAI互換APIの `reasoning_content` / `content` および `usage.reasoning_tokens` で取得できる。lm-evaluation-harness 等のデフォルト集計には入らないので自前で拾う。
 
-### 精度(機械採点完結)
+### 精度(機械採点完結、各公式リーダーボードと同形式)
 
 | ベンチ | 内容 | 採点 |
 |---|---|---|
-| llm-jp-eval 短縮版 | JCommonsenseQA, JEMHopQA, JSQuAD, MGSM-ja 等 | accuracy / EM / F1 |
-| IgakuQA + IgakuQA119 | 医師国家試験 (2018-2022 + 第119回) | accuracy (MCQ) |
-| JMED-LLM | JMMLU-Med / MRNER / NRNER / CRADE / RRTNM / SMDIS / JCSTS | accuracy / Cohen's κ / F1 |
+| llm-jp-eval 短縮版 | JCommonsenseQA, JEMHopQA, JSQuAD, MGSM-ja | exact_match / char_f1 / mathematical_equivalence |
+| IgakuQA (2018-2022) | 医師国家試験 5年分 | 配点(問題内蔵 `points`) + accuracy、Overall/No-Img |
+| IgakuQA119 (第119回) | 必修3点/一般1点、計500点満点 | Overall Score / Overall Acc. / No-Img Score / No-Img Acc. |
+| JMED-LLM (MCQ 5タスク) | JMMLU-Med, CRADE, RRTNM, SMDIS, JCSTS | `kappa(accuracy)`、CRADE/JCSTS は線形重み付き κ |
 
 LLM-as-a-judge は本フェーズでは使わない(機械採点で完結する範囲に限定)。
 

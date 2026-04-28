@@ -46,6 +46,9 @@ class SampleResult:
     problem_id: str
     block: str
     is_numeric: bool
+    is_required: bool   # B/E blocks
+    has_image: bool
+    points_possible: int  # 1 or 3 per official scoring
     gold: str
     extracted: str
     extracted_set: list[str]
@@ -156,6 +159,9 @@ def run(
                 problem_id=p["number"],
                 block=p["block"],
                 is_numeric=not p["choices"],
+                is_required=p["block"] in REQUIRED_BLOCKS,
+                has_image=p.get("has_image", False),
+                points_possible=points_for(p["number"], p["block"]),
                 gold=p["gold"],
                 extracted=extracted,
                 extracted_set=ext_set,
@@ -177,6 +183,42 @@ def run(
     out_path = output_dir / "igakuqa119.json"
     out_path.write_text(json.dumps(aggregate, ensure_ascii=False, indent=2))
     return out_path
+
+
+def _bucket(samples: list[SampleResult]) -> dict[str, Any]:
+    correct = sum(s.correct for s in samples)
+    total = len(samples)
+    score = sum(s.points_possible for s in samples if s.correct)
+    possible_score = sum(s.points_possible for s in samples)
+    return {
+        "correct": correct,
+        "total": total,
+        "accuracy": (correct / total) if total else 0.0,
+        "score": score,
+        "possible_score": possible_score,
+        "score_rate": (score / possible_score) if possible_score else 0.0,
+        "score_str": f"{score}/{possible_score} ({100 * score / possible_score:.2f}%)" if possible_score else "0/0 (-)",
+        "accuracy_str": f"{correct}/{total} ({100 * correct / total:.2f}%)" if total else "0/0 (-)",
+    }
+
+
+def compute_leaderboard(samples: list[SampleResult]) -> dict[str, Any]:
+    """Build IgakuQA119 leaderboard-format breakdown.
+
+    Mirrors columns: Overall Score | Overall Acc. | No-Img Score | No-Img Acc.
+    Plus required/general split. Note: if image questions were skipped at run
+    time, "overall" reflects only the questions that were actually scored;
+    use --include-image to populate the full 500-pt overall.
+    """
+    no_image = [s for s in samples if not s.has_image]
+    return {
+        "overall": _bucket(samples),
+        "no_image": _bucket(no_image),
+        "required": _bucket([s for s in samples if s.is_required]),
+        "general": _bucket([s for s in samples if not s.is_required]),
+        "no_image_required": _bucket([s for s in no_image if s.is_required]),
+        "no_image_general": _bucket([s for s in no_image if not s.is_required]),
+    }
 
 
 def percentile(xs: list[float | None], p: float) -> float | None:
@@ -210,6 +252,8 @@ def aggregate_results(
     for s in samples:
         by_block.setdefault(s.block, []).append(s.correct)
 
+    leaderboard = compute_leaderboard(samples)
+
     return {
         "task": "igakuqa119",
         "model": model,
@@ -219,6 +263,7 @@ def aggregate_results(
         "metrics": {
             "accuracy": sum(s.correct for s in samples) / len(samples) if samples else 0.0,
         },
+        "leaderboard": leaderboard,
         "accuracy_by_block": {
             b: {"n": len(v), "accuracy": sum(v) / len(v)} for b, v in sorted(by_block.items())
         },
@@ -249,6 +294,21 @@ def _count(xs: list[Any]) -> dict[str, int]:
 
 
 ALL_BLOCKS = ["119A", "119B", "119C", "119D", "119E", "119F"]
+REQUIRED_BLOCKS = {"119B", "119E"}
+
+
+def points_for(problem_id: str, block: str) -> int:
+    """Official IgakuQA119 scoring:
+    必修 (B/E blocks): Q1-25 = 1pt, Q26-50 = 3pt
+    一般 (A/C/D/F):    1pt
+    """
+    if block not in REQUIRED_BLOCKS:
+        return 1
+    # extract numeric suffix from e.g. "119B26"
+    suffix = problem_id[len(block):]
+    digits = "".join(c for c in suffix if c.isdigit())
+    n = int(digits) if digits else 0
+    return 3 if 26 <= n <= 50 else 1
 
 
 def main() -> int:

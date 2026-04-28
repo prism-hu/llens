@@ -20,7 +20,16 @@ fi
 MODEL="$1"
 SUBDIR="$2"
 shift 2
-EXTRA=("$@")
+
+# Split args: --include-image is only valid for igakuqa / igakuqa119.
+COMMON_ARGS=()
+IMAGE_ARGS=()
+for arg in "$@"; do
+  case "$arg" in
+    --include-image) IMAGE_ARGS+=("$arg") ;;
+    *) COMMON_ARGS+=("$arg") ;;
+  esac
+done
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT="$ROOT/evals/results/$SUBDIR"
@@ -32,15 +41,15 @@ run() {
   echo "============================================================"
   echo "[$label] -> $OUT"
   echo "============================================================"
-  uv run --group evals python "$@" --model "$MODEL" --output-dir "$OUT" "${EXTRA[@]}"
+  uv run --group evals python "$@" --model "$MODEL" --output-dir "$OUT"
 }
 
 cd "$ROOT"
 
-run llm-jp-eval-subset -m evals.tasks.llm_jp_eval_subset.run --task all
-run igakuqa            -m evals.tasks.igakuqa.run
-run igakuqa119         -m evals.tasks.igakuqa119.run
-run jmed-llm           -m evals.tasks.jmed_llm.run --task all
+run llm-jp-eval-subset -m evals.tasks.llm_jp_eval_subset.run --task all "${COMMON_ARGS[@]}"
+run igakuqa            -m evals.tasks.igakuqa.run            "${COMMON_ARGS[@]}" "${IMAGE_ARGS[@]}"
+run igakuqa119         -m evals.tasks.igakuqa119.run         "${COMMON_ARGS[@]}" "${IMAGE_ARGS[@]}"
+run jmed-llm           -m evals.tasks.jmed_llm.run --task all "${COMMON_ARGS[@]}"
 
 echo
 echo "[done] phase complete -> $OUT"

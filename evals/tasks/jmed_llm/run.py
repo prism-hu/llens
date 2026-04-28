@@ -37,6 +37,17 @@ TASKS = {
     "jcsts": "JCSTS",
 }
 
+# Linear-weighted κ for ordinal labels (per JMED-LLM official leaderboard).
+# For RRTNM the staging axes are also ordinal. JMMLU-Med / SMDIS are nominal.
+LINEAR_WEIGHTED_TASKS = {"crade", "jcsts"}
+
+# Label order for ordinal tasks. Treated as the ordinal axis when computing
+# linear-weighted κ. Matches the order options are listed in the source CSV.
+ORDINAL_LABELS = {
+    "crade": ["A", "B", "C", "D"],
+    "jcsts": ["A", "B", "C", "D", "E", "F"],
+}
+
 OPTION_LETTERS = "ABCDEF"
 EXTRACT_RE = re.compile(r"<answer>(.*?)</answer>", re.DOTALL)
 
@@ -45,6 +56,59 @@ INSTRUCTION = (
     "選択肢の記号({letters})だけを <answer></answer> タグで囲んで答えてください "
     "(例: <answer>A</answer>)。"
 )
+
+
+def cohen_kappa(
+    y_true: list[str],
+    y_pred: list[str],
+    labels: list[str],
+    *,
+    weights: str = "none",
+) -> float:
+    """Compute Cohen's κ. weights='linear' applies linearly-weighted κ for
+    ordinal labels (per JMED-LLM leaderboard convention for CRADE/JCSTS).
+    Out-of-vocabulary predictions are kept and treated as a distinct miss
+    (mapped to a synthetic OOV bucket — they reduce κ as expected).
+    """
+    if not y_true:
+        return 0.0
+    # Map labels to indices; out-of-vocab predictions get index n_labels (OOV)
+    idx_of = {l: i for i, l in enumerate(labels)}
+    n = len(labels)
+    n_with_oov = n + 1
+    cm = [[0] * n_with_oov for _ in range(n_with_oov)]
+    for t, p in zip(y_true, y_pred):
+        ti = idx_of.get(t, n)
+        pi = idx_of.get(p, n)
+        cm[ti][pi] += 1
+
+    total = sum(sum(row) for row in cm)
+    if total == 0:
+        return 0.0
+    # Weights: linear for ordinal axis (only over the n real labels).
+    # Treat OOV as the most distant class (weight = 1) for both linear and unweighted.
+    def w(i: int, j: int) -> float:
+        if i == j:
+            return 0.0
+        if i == n or j == n:
+            return 1.0
+        if weights == "linear":
+            return abs(i - j) / max(n - 1, 1)
+        return 1.0  # unweighted: any disagreement counts equally
+
+    row_marg = [sum(cm[i]) / total for i in range(n_with_oov)]
+    col_marg = [sum(cm[i][j] for i in range(n_with_oov)) / total for j in range(n_with_oov)]
+
+    obs_disagree = 0.0
+    exp_disagree = 0.0
+    for i in range(n_with_oov):
+        for j in range(n_with_oov):
+            wij = w(i, j)
+            obs_disagree += wij * (cm[i][j] / total)
+            exp_disagree += wij * (row_marg[i] * col_marg[j])
+    if exp_disagree == 0:
+        return 0.0
+    return 1.0 - obs_disagree / exp_disagree
 
 
 @dataclass
@@ -188,13 +252,32 @@ def aggregate_results(
         if s.tag:
             by_tag.setdefault(s.tag, []).append(s.correct)
 
+    # JMED-LLM leaderboard: κ(accuracy). Linear-weighted κ for CRADE/JCSTS, unweighted otherwise.
+    weights = "linear" if task in LINEAR_WEIGHTED_TASKS else "none"
+    labels = ORDINAL_LABELS.get(task) or sorted({s.gold for s in samples})
+    accuracy = sum(s.correct for s in samples) / len(samples) if samples else 0.0
+    kappa = cohen_kappa(
+        [s.gold for s in samples],
+        [s.extracted for s in samples],
+        labels,
+        weights=weights,
+    )
+
     return {
         "task": task,
         "model": model,
         "mode": "think_off" if no_think else "think_on",
         "n": len(samples),
         "metrics": {
-            "accuracy": sum(s.correct for s in samples) / len(samples) if samples else 0.0,
+            "accuracy": accuracy,
+            "cohen_kappa": kappa,
+            "kappa_weighting": weights,
+        },
+        "leaderboard": {
+            "kappa": kappa,
+            "accuracy": accuracy,
+            "weighting": weights,
+            "display": f"{kappa:.2f}({accuracy:.2f})",
         },
         "accuracy_by_tag": {
             t: {"n": len(v), "accuracy": sum(v) / len(v)}

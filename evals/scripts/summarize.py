@@ -64,6 +64,54 @@ def get_metric(d: dict[str, Any]) -> float | None:
     return None
 
 
+def render_leaderboard(results: dict[str, dict[str, Any]], label: str) -> str:
+    """Render rows aligned with each benchmark's public leaderboard format."""
+    out = [f"## leaderboard rows: {label}\n"]
+
+    # IgakuQA / IgakuQA119: Overall Score | Overall Acc. | No-Img Score | No-Img Acc.
+    for task in ("igakuqa", "igakuqa119"):
+        d = results.get(task)
+        if not d or "leaderboard" not in d:
+            continue
+        lb = d["leaderboard"]
+        out.append(f"### {task} (https://github.com/naoto-iwase/IgakuQA119 style)\n")
+        cols = ["Entry", "Overall Score", "Overall Acc.", "No-Img Score", "No-Img Acc."]
+        out.append("| " + " | ".join(cols) + " |")
+        out.append("|" + "|".join(["---"] * len(cols)) + "|")
+        out.append("| " + " | ".join([
+            f"{label}",
+            lb["overall"]["score_str"],
+            lb["overall"]["accuracy_str"],
+            lb["no_image"]["score_str"],
+            lb["no_image"]["accuracy_str"],
+        ]) + " |\n")
+
+    # JMED-LLM: kappa(accuracy) per task, plus average (per their README)
+    jmed_tasks = ["jmmlu_med", "crade", "rrtnm", "smdis", "jcsts"]
+    jmed_present = [t for t in jmed_tasks if t in results and "leaderboard" in results[t]]
+    if jmed_present:
+        out.append("### JMED-LLM (https://github.com/sociocom/JMED-LLM style)\n")
+        cols = ["Entry"] + jmed_present + ["Average"]
+        out.append("| " + " | ".join(cols) + " |")
+        out.append("|" + "|".join(["---"] * len(cols)) + "|")
+        kappas, accs = [], []
+        cells = [label]
+        for t in jmed_present:
+            lb = results[t]["leaderboard"]
+            cells.append(lb["display"])
+            kappas.append(lb["kappa"])
+            accs.append(lb["accuracy"])
+        if kappas:
+            avg = f"{sum(kappas) / len(kappas):.2f}({sum(accs) / len(accs):.2f})"
+        else:
+            avg = "-"
+        cells.append(avg)
+        out.append("| " + " | ".join(cells) + " |\n")
+        out.append("(注: 上は MCQ 5タスクのみ。NER 系 (CRNER/RRNER/NRNER) は未実装)\n")
+
+    return "\n".join(out) + "\n"
+
+
 def render_timeline(results: dict[str, dict[str, Any]], label: str) -> str:
     header = f"## timeline: {label}\n\n"
     cols = ["task", "started_at", "ended_at", "duration"]
@@ -178,12 +226,14 @@ def main() -> int:
     base = load_dir(args.input_dir)
     base_label = args.input_dir.name
     print(render_table(base, base_label))
+    print(render_leaderboard(base, base_label))
     print(render_timeline(base, base_label))
 
     if args.compare:
         other = load_dir(args.compare)
         other_label = args.compare.name
         print(render_table(other, other_label))
+        print(render_leaderboard(other, other_label))
         print(render_timeline(other, other_label))
         print(render_compare(base, other, base_label, other_label))
     return 0

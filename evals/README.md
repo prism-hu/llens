@@ -103,18 +103,42 @@ evals/
 `scripts/run_phase.sh <model> <output_subdir> [extra args...]` で全11タスクを連続実行:
 
 ```bash
-# Phase 1: GLM 5.1 thinking ON
+# Phase 1: GLM 5.1 thinking ON (No-Img のみ)
 ./evals/scripts/run_phase.sh glm-5.1 glm-5.1-think-on
 
-# Phase 3: GLM 5.1 thinking OFF (追加引数は全タスクに転送される)
+# 公開リーダーボードの "Overall" 列も埋めたい場合 (画像問題込み)
+./evals/scripts/run_phase.sh glm-5.1 glm-5.1-think-on --include-image
+
+# Phase 3: GLM 5.1 thinking OFF
 ./evals/scripts/run_phase.sh glm-5.1 glm-5.1-think-off --no-think
 
 # スモーク: 各タスク N=5 のみ
 ./evals/scripts/run_phase.sh glm-5.1 _smoke --limit 5
 ```
 
+引数の振り分け:
+- `--include-image` は `igakuqa` / `igakuqa119` だけに転送(他タスクは知らない)
+- それ以外 (`--limit`, `--no-think`, `--max-tokens`, `--temperature`) は全タスクに転送
+
 注意: SMDIS は 15K行以上、JCSTS は 3.6K行、CRADE は 1.6K行。フルランは数時間〜半日。
 本番ランの前に必ず `--limit N` で wiring を確認。
+
+## 公開リーダーボードと並びの指標
+
+各タスクは公式リーダーボードと同じ形式で集計されます(結果JSONの `leaderboard` キーに格納):
+
+| ベンチ | 形式 | 例 |
+|---|---|---|
+| IgakuQA / IgakuQA119 | `Overall Score`/`Overall Acc.`/`No-Img Score`/`No-Img Acc.` | `461/500 (92.20%)` |
+| JMED-LLM | `kappa(accuracy)`、CRADE/JCSTS は **線形重み付き κ** | `0.54(0.53)` |
+| llm-jp-eval | 各タスクの公式メトリクス(exact_match / char_f1 / mathematical_equivalence) | `0.823` |
+
+IgakuQA119 のスコアリング規則(`tasks/igakuqa119/run.py`):
+- 必修問題 (B/E ブロック): Q1-25 = 1点、Q26-50 = **3点**
+- 一般問題 (A/C/D/F): 1点
+- 計500点満点 / 400問
+
+IgakuQA (2018-2022) は各問題に `points` フィールドが含まれており、それをそのまま使用。
 
 ## 結果の確認
 
@@ -122,9 +146,10 @@ evals/
 uv run --group evals python evals/scripts/summarize.py evals/results/glm-5.1-think-on
 ```
 
-出力:
+出力セクション:
 - **score table**: タスクごとの精度、TTAT、think tokens
-- **timeline**: タスクごとの `started_at` / `ended_at` (ISO8601 + epoch_ms) — Grafana の時間レンジ指定に流用可能
+- **leaderboard rows**: 各公式リポジトリ README にそのまま貼れる Markdown 行(IgakuQA / IgakuQA119 / JMED-LLM)
+- **timeline**: タスクごとの `started_at` / `ended_at` (ISO8601 + epoch_ms) — Grafana 時間レンジ指定に流用可能
 
 `--compare <other-dir>` で別ランとの差分(score Δ、TTAT Δ、think_tokens 比較)も出る。
 
