@@ -1,193 +1,116 @@
-# evals
+# evals — 院内デプロイ候補モデルの日本語性能評価
 
-院内デプロイ候補モデルの日本語性能評価。背景・方針・フェーズは `docs/evals.md` 参照。
+フロンティアOSS LLM(GLM-5.1 / DeepSeek V3.2 / Kimi K2.6)の日本語+医療性能を、
+公開リーダーボード(IgakuQA119, JMED-LLM, llm-jp-eval系)と同形式で計測。
 
-## セットアップ
+- 評価仕様の詳細(ベンチ規模、採点ルール、ランナー仕様): [`SPEC.md`](./SPEC.md)
+- フェーズ進捗・各Phaseの完全な結果: [`docs/eval_results.md`](../docs/eval_results.md)
+
+## 結果サマリ (最新: Phase 1 = GLM-5.1 thinking ON、9タスク完了)
+
+### IgakuQA119 (第119回医師国家試験)
+
+公式LB の 4列形式(Overall + No-Img)。Llama 系省略、国産は参考:
+
+| Entry | Overall Score | Overall Acc. | No-Img Score | No-Img Acc. |
+|---|---|---|---|---|
+| Gemini-2.5-Pro | 485/500 (97.00%) | 389/400 (97.25%) | 372/383 (97.13%) | 290/297 (97.64%) |
+| OpenAI-o3 | 482/500 (96.40%) | 384/400 (96.00%) | 370/383 (96.61%) | 286/297 (96.30%) |
+| Claude-Sonnet-4 | 471/500 (94.20%) | 375/400 (93.75%) | 363/383 (94.78%) | 281/297 (94.61%) |
+| DeepSeek-R1-0528 | 461/500 (92.20%) | 367/400 (91.75%) | 364/383 (95.04%) | 282/297 (94.95%) |
+| DeepSeek-R1 | 448/500 (89.60%) | 356/400 (89.00%) | 350/383 (91.38%) | 270/297 (90.91%) |
+| GPT-4o-mini | 345/500 (69.00%) | 279/400 (69.75%) | 269/383 (70.23%) | 215/297 (72.39%) |
+| (参考) Preferred-MedLLM-Qwen-72B (国産医療FT) | 332/500 (66.40%) | 272/400 (68.00%) | 261/383 (68.15%) | 209/297 (70.37%) |
+|   |   |   |   |   |
+| **GLM-5.1 (本検証 text-only)** | - | - | **357/383 (93.21%)** | **281/297 (94.61%)** |
+| **Kimi K2.6 (本検証 vision)** | (Phase 4 進行中) | | | |
+
+**GLM-5.1 (text-only) の No-Img Acc. は Claude-Sonnet-4 と完全同点**。Overall は text-only モデルなので "-"(画像問題は auto-skip)。**Kimi K2.6 (vision OK 検出済み) で Overall 列も埋まる予定** → Gemini 2.5 / o3 等の vision frontier モデルとの直接比較が可能になる。
+
+### JMED-LLM (MCQ 3タスク、`κ(accuracy)` 形式) — Avg κ で並び替え
+
+| Entry | jmmlu_med | crade | rrtnm | Avg κ |
+|---|---|---|---|---|
+| **GLM-5.1 (本検証)** | **0.89(0.92)** | **0.64(0.81)** | **0.89(0.92)** | **0.807** |
+| gpt-4o-2024-08-06 | 0.82(0.87) | 0.54(0.53) | 0.85(0.90) | 0.737 |
+| gpt-4o-mini | 0.77(0.83) | 0.21(0.37) | 0.58(0.71) | 0.520 |
+| gemma-2-9b-it | 0.52(0.64) | 0.33(0.42) | 0.54(0.68) | 0.463 |
+| (参考) Llama-3-ELYZA-JP-8B (国産日本語FT) | 0.34(0.51) | 0.01(0.26) | 0.29(0.52) | 0.213 |
+
+**GLM-5.1 が κ Average で全モデルを上回り 1位**。GPT-4o を含めて圧倒。
+
+JMED-LLM 公式 LB に Claude 4系/GPT-5/Gemini 2.5+ の評価は無く、現状 GPT-4o が最新クラウド baseline。SMDIS/JCSTS は除外(`SPEC.md`)。
+
+### IgakuQA (2018-2022、5年合算) — No-Img
+
+| Entry | No-Img Score | No-Img Acc. |
+|---|---|---|
+| 学生(多数決) | 1784/1864 (95.71%) | 1388/1471 (94.36%) |
+| **GLM-5.1 (本検証)** | **1742/1864 (93.45%)** | **1368/1471 (93.00%)** |
+| GPT-4 (2023, Kasai+) | 1557/1864 (83.53%) | 1213/1471 (82.46%) |
+| ChatGPT (2023, Kasai+) | 1093/1864 (58.64%) | 860/1471 (58.46%) |
+
+**GPT-4 (2023) を 10 ポイント上回り、医学生多数決にあと 2% まで肉薄**。
+
+注: Claude 4系 / GPT-5 / Gemini 2.5+ の IgakuQA 2018-2022 直接評価値は publicly に存在しない(2026-04 時点)。IgakuQA119 が最新クラウドモデルの比較ライン。詳細は `docs/eval_results.md`。
+
+### llm-jp-eval (短縮版)
+
+| Task | GLM-5.1 |
+|---|---|
+| JCommonsenseQA (exact_match) | 0.977 |
+| JEMHopQA (exact_match) | 0.658 |
+| JSQuAD (exact_match) | 0.812 |
+| MGSM-ja (math_equiv) | 0.432 |
+
+比較相手は **未補強**(Nejumi LB は評価条件が異なり直接引用不可)。後日 OpenRouter 等の OpenAI 互換エンドポイント経由で Claude/GPT/Gemini を本ハーネスから叩いて apples-to-apples 値を埋める方針。
+
+詳細・公開LBの全行・含意・速度値・備考は **[`docs/eval_results.md`](../docs/eval_results.md)** 参照。
+
+## 簡易使い方
 
 ```bash
+# 1. 依存
 uv sync --group evals
-```
 
-## データセット取得
-
-```bash
+# 2. データセット取得 (gitignored、外部ライセンスは各リポジトリ参照)
 ./evals/scripts/fetch_datasets.sh
-```
 
-`evals/datasets/` 配下に以下を clone (gitignored、外部リポジトリのライセンスはそれぞれ参照):
-
-| ベンチ | リポジトリ | ライセンス | 備考 |
-|---|---|---|---|
-| IgakuQA (2018-2022) | [jungokasai/IgakuQA](https://github.com/jungokasai/IgakuQA) | 明記なし(問題は厚労省公式) | データそのまま |
-| IgakuQA119 (第119回) | [naoto-iwase/IgakuQA119](https://github.com/naoto-iwase/IgakuQA119) | code Apache-2.0 / data CC BY 4.0 | OCR済 |
-| JMED-LLM | [sociocom/JMED-LLM](https://github.com/sociocom/JMED-LLM) | サブセットごと(CC-BY系混在、一部 NC) | 7タスク全部入り |
-| llm-jp-eval | [llm-jp/llm-jp-eval](https://github.com/llm-jp/llm-jp-eval) | Apache-2.0 (各データセットは DATASET.md 参照) | 別途 preprocess 必要 |
-
-llm-jp-eval は前処理スクリプトの実行が別途必要。`-d` は1タスクずつ:
-
-```bash
-cd evals/datasets/llm_jp_eval
-uv sync
-for task in jcommonsenseqa jemhopqa jsquad mgsm; do
-  uv run python scripts/preprocess_dataset.py -d "$task" -o ./dataset
+# 3. llm-jp-eval は前処理が別途必要 (詳細 SPEC.md)
+cd evals/datasets/llm_jp_eval && uv sync && cd -
+for t in jcommonsenseqa jemhopqa jsquad mgsm; do
+  (cd evals/datasets/llm_jp_eval && uv run python scripts/preprocess_dataset.py -d "$t" -o ./dataset)
 done
+
+# 4. SGLang 起動 (例: GLM-5.1)
+./scripts/sglang-glm5.1.sh   # 別ターミナル
+
+# 5. スモーク確認 → 本ラン
+./evals/scripts/run_phase.sh glm-5.1 _smoke --limit 5
+./evals/scripts/run_phase.sh glm-5.1 glm-5.1-think-on
+
+# 6. 集計 (公開LB形式の Markdown 行も出力)
+uv run --group evals python evals/scripts/summarize.py evals/results/glm-5.1-think-on
 ```
 
-**HF認証**: 上記4タスクは認証不要(JCommonsenseQA/JEMHopQA/JSQuAD は GitHub raw、MGSM-ja は HF だが open)。
-
-将来 HLE系タスク (`cais/hle`, `llm-jp/jhle`) を追加する場合のみフォーム承認 + ログインが必要:
-
-```bash
-uv run hf auth login    # 旧 huggingface-cli login と互換
-```
-
-## ハーネス: 動作確認
-
-SGLang サーバー (`scripts/sglang-glm5.1.sh` 等) を起動した状態で:
-
-```bash
-uv run --group evals python -m evals.harness.client \
-  --base-url http://localhost:8000 \
-  --model glm-5.1 \
-  --prompt "日本の首都はどこですか。一文で答えて。"
-```
-
-`--no-think` で thinking OFF。出力に TTFT / TTAT / reasoning_tokens / answer_tokens が並ぶ。
+タスク族の個別フラグや `run_phase.sh` の引数振り分け、`summarize.py` の出力詳細は [`SPEC.md`](./SPEC.md)。
 
 ## ディレクトリ
 
 ```
 evals/
-├── harness/client.py            # streaming + reasoning分離クライアント
+├── README.md             # このファイル(結果サマリ + 簡易使い方)
+├── SPEC.md               # 詳細仕様(ベンチ・採点・ランナー)
+├── harness/client.py     # streaming + reasoning分離クライアント
 ├── tasks/
-│   ├── llm_jp_eval_subset/      # jcommonsenseqa, jemhopqa, jsquad, mgsm
-│   ├── igakuqa/                 # IgakuQA 2018-2022
-│   ├── igakuqa119/              # IgakuQA 第119回
-│   └── jmed_llm/                # jmmlu_med, crade, rrtnm, smdis, jcsts
+│   ├── llm_jp_eval_subset/
+│   ├── igakuqa/
+│   ├── igakuqa119/       # vision auto-probe 対応
+│   └── jmed_llm/
 ├── scripts/
-│   ├── fetch_datasets.sh        # 外部データ clone
-│   ├── run_phase.sh             # 1モデル × 1モードで全タスク連続実行
-│   └── summarize.py             # results を Markdown テーブルに集約
-├── datasets/                    # gitignored (clone先)
-└── results/<subdir>/<task>.json # gitignored (実行結果)
+│   ├── fetch_datasets.sh
+│   ├── run_phase.sh      # 1モデル全タスク連続実行
+│   └── summarize.py      # 結果集約 (Markdown + Grafana用 timestamp)
+├── datasets/             # gitignored (clone先)
+└── results/<subdir>/<task>.json   # gitignored
 ```
-
-## タスクランナー
-
-各タスクは `evals.tasks.<name>.run` で叩く。共通フラグ:
-
-```
---base-url    SGLang endpoint (default http://localhost:8000)
---model       served-model-name
---task        タスク名 or "all" (タスク族による)
---output-dir  結果JSON保存先
---limit N     先頭N問のみ (スモーク用、SMDIS/CRADE/JCSTS 等の大型データに有用)
---no-think    chat_template_kwargs.enable_thinking=False
---max-tokens  default 32768
---temperature default 0.0
-```
-
-タスク族ごとの個別フラグ:
-
-| 族 | 個別フラグ |
-|---|---|
-| `tasks.llm_jp_eval_subset` | `--task {jcommonsenseqa,jemhopqa,jsquad,mgsm,all}` |
-| `tasks.igakuqa` | `--years 2018 2019 ...` `--include-image` |
-| `tasks.igakuqa119` | `--blocks 119A 119B ...` `--no-vision`(auto-probeをスキップして強制text-only) |
-| `tasks.jmed_llm` | `--task {jmmlu_med,crade,rrtnm,smdis,jcsts,all}` (`all` は smdis/jcsts 除外、両者明示時のみ実行可) |
-
-出力: `<output-dir>/<task>.json` — metrics、timing分布(median/p90/max)、token分布、全サンプル raw/extracted/正誤。
-
-## フェーズ実行
-
-`scripts/run_phase.sh <model> <output_subdir> [extra args...]` で全11タスクを連続実行:
-
-```bash
-# Phase 1: GLM 5.1 thinking ON (No-Img のみ)
-./evals/scripts/run_phase.sh glm-5.1 glm-5.1-think-on
-
-# 公開リーダーボードの "Overall" 列も埋めたい場合 (画像問題込み)
-./evals/scripts/run_phase.sh glm-5.1 glm-5.1-think-on --include-image
-
-# Phase 3: GLM 5.1 thinking OFF
-./evals/scripts/run_phase.sh glm-5.1 glm-5.1-think-off --no-think
-
-# スモーク: 各タスク N=5 のみ
-./evals/scripts/run_phase.sh glm-5.1 _smoke --limit 5
-```
-
-引数の振り分け:
-- `--no-vision` は `igakuqa119` だけに転送(他タスクは vision 概念が無い、または画像ファイル非同梱)
-- それ以外 (`--limit`, `--no-think`, `--max-tokens`, `--temperature`) は全タスクに転送
-
-**画像問題の扱い (auto-probe)**:
-- `igakuqa119` は起動時に red square 画像で multimodal capability を probe(応答に "red"/"赤" 含むかを判定)
-- vision OK: 画像問題を multimodal API で評価 (Overall 列が埋まる)
-- vision NG: 画像問題を自動スキップ (No-Img 列のみ)
-- `igakuqa` (2018-2022) は画像ファイル非同梱のため画像問題は常時スキップ
-
-注意: フルランは数時間〜半日(CRADE 1.6K行、IgakuQA 5年合算 ~1.5K行 等)。
-SMDIS (15K行 / ~55h) と JCSTS (3.6K行 / ~20h) は重要度低・コスト過大のため
-`--task all` から除外済(理由は `docs/evals.md` 末尾参照)。
-明示的に `--task smdis` / `--task jcsts` で叩けば実行可能。
-本番ランの前に必ず `--limit N` で wiring を確認。
-
-## 公開リーダーボードと並びの指標
-
-各タスクは公式リーダーボードと同じ形式で集計されます(結果JSONの `leaderboard` キーに格納):
-
-| ベンチ | 形式 | 例 |
-|---|---|---|
-| IgakuQA / IgakuQA119 | `Overall Score`/`Overall Acc.`/`No-Img Score`/`No-Img Acc.` | `461/500 (92.20%)` |
-| JMED-LLM | `kappa(accuracy)`、CRADE/JCSTS は **線形重み付き κ** | `0.54(0.53)` |
-| llm-jp-eval | 各タスクの公式メトリクス(exact_match / char_f1 / mathematical_equivalence) | `0.823` |
-
-IgakuQA119 のスコアリング規則(`tasks/igakuqa119/run.py`):
-- 必修問題 (B/E ブロック): Q1-25 = 1点、Q26-50 = **3点**
-- 一般問題 (A/C/D/F): 1点
-- 計500点満点 / 400問
-
-IgakuQA (2018-2022) は各問題に `points` フィールドが含まれており、それをそのまま使用。
-
-## 結果の確認
-
-```bash
-uv run --group evals python evals/scripts/summarize.py evals/results/glm-5.1-think-on
-```
-
-出力セクション:
-- **score table**: タスクごとの精度、TTAT、think tokens
-- **leaderboard rows**: 各公式リポジトリ README にそのまま貼れる Markdown 行(IgakuQA / IgakuQA119 / JMED-LLM)
-- **timeline**: タスクごとの `started_at` / `ended_at` (ISO8601 + epoch_ms) — Grafana 時間レンジ指定に流用可能
-
-`--compare <other-dir>` で別ランとの差分(score Δ、TTAT Δ、think_tokens 比較)も出る。
-
-## Grafana との突き合わせ
-
-各タスクJSONに以下が記録される:
-
-```json
-"started_at": "2026-04-28T14:44:07+09:00",
-"ended_at": "2026-04-28T14:44:13+09:00",
-"started_epoch_ms": 1777355047398,
-"ended_epoch_ms": 1777355053624,
-"duration_sec": 6.23,
-```
-
-`*_epoch_ms` をそのまま Grafana の Time Range (`from=...&to=...`) に貼ればその時間帯のメトリクスが出る。SGLang の `:8000/metrics` (Prometheus) や DCGM exporter の GPU 利用率/温度を後追い確認できる。
-
-## 進捗
-
-- [x] `harness/client.py` (streaming + reasoning分離)
-- [x] `scripts/fetch_datasets.sh` (外部データクローン)
-- [x] `tasks/llm_jp_eval_subset/run.py` (jcommonsenseqa, jemhopqa, jsquad, mgsm)
-- [x] `tasks/igakuqa/run.py` (2018-2022、5年分)
-- [x] `tasks/igakuqa119/run.py` (第119回、A-F)
-- [x] `tasks/jmed_llm/run.py` (MCQ 3タスク: jmmlu_med, crade, rrtnm。smdis/jcsts は重要度低のため `--task all` から除外、明示時のみ実行可)
-- [x] `scripts/run_phase.sh` (全タスク連続実行)
-- [x] `scripts/summarize.py` (Markdown集約)
-- [ ] `harness/speed.py` (並列ロード時の TTFT/throughput 測定 — Phase 1 では per-request timing で代替)
-- [x] JMED-LLM の Cohen's κ (CRADE は線形重み付き)
-- [ ] JMED-LLM の JCSTS 線形重み付き κ (現状 ALL_TASKS 除外、明示実行時のみ計算される)
-- [ ] JMED-LLM NER系 (CRNER/RRNER/NRNER)
-- [ ] `harness/accuracy.py` (3 ランナー共通部の抽出 — 任意)
