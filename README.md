@@ -305,6 +305,47 @@ uv run hf download Qwen/Qwen3.5-397B-A17B-FP8 --local-dir ./models/Qwen3.5-397B-
 
 > DeepSeek V3.2 より更に軽量。speculative decoding (NEXTN) 対応。
 
+### ベンチマーク比較用(国産モデル)
+
+`evals/` で国内日本語FT組と対比するためのモデル。本番運用候補ではない。
+
+| モデル | HF |
+|---|---|
+| llm-jp-3 8x13B Instruct3 | [llm-jp/llm-jp-3-8x13b-instruct3](https://huggingface.co/llm-jp/llm-jp-3-8x13b-instruct3) |
+| SIP-jmed-llm 3 8x13B (医療特化) | [SIP-med-LLM/SIP-jmed-llm-3-8x13b-OP-32k-R0.1](https://huggingface.co/SIP-med-LLM/SIP-jmed-llm-3-8x13b-OP-32k-R0.1) |
+
+```bash
+uv run hf download llm-jp/llm-jp-3-8x13b-instruct3 --local-dir ./models/llm-jp-3-8x13b-instruct3
+uv run hf download SIP-med-LLM/SIP-jmed-llm-3-8x13b-OP-32k-R0.1 --local-dir ./models/SIP-jmed-llm-3-8x13b-OP-32k-R0.1
+```
+
+起動 (共通スクリプト):
+
+```bash
+# 単独 (デフォルト GPU 0-1, port 8000)
+./scripts/sglang-llm-jp-3-bench.sh instruct3
+./scripts/sglang-llm-jp-3-bench.sh sip-jmed
+
+# 2モデル並列 (GPU 0-1 と 2-3 に分けて同時起動、port 別)
+CUDA_VISIBLE_DEVICES=0,1 PORT=8000 ./scripts/sglang-llm-jp-3-bench.sh instruct3 &
+CUDA_VISIBLE_DEVICES=2,3 PORT=8001 ./scripts/sglang-llm-jp-3-bench.sh sip-jmed  &
+wait
+
+# 並列 eval (各々別 base-url を指定)
+./evals/scripts/run_phase.sh llm-jp-3-8x13b-instruct3 llm-jp-instruct3 \
+  --base-url http://localhost:8000 &
+./evals/scripts/run_phase.sh sip-jmed-llm-3-8x13b sip-jmed \
+  --base-url http://localhost:8001 &
+wait
+```
+
+> 8x13B MoE は全体 ~47B / FP16 ~94GB なので **TP=2 (=GPU 2基)** で十分。frontier モデル群と並走可能。
+> TP は `CUDA_VISIBLE_DEVICES` の GPU 数から自動判定。
+>
+> 推奨サンプリング (モデルカード): `temperature 0.5`, `top_p 0.8`, `repeat_penalty 1.05`。
+> ただし `evals/` での精度比較は再現性のため `temperature 0` 固定。
+> プロンプト形式は `### 指示: ... ### 応答:` (Alpaca風)、stop は `<EOD|LLM-jp>` (tokenizer 設定で自動認識)。
+
 ## 監視
 
 SGLang 側は `--enable-metrics` 付きで起動する。
