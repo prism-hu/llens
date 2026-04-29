@@ -69,22 +69,35 @@ def render_leaderboard(results: dict[str, dict[str, Any]], label: str) -> str:
     out = [f"## leaderboard rows: {label}\n"]
 
     # IgakuQA / IgakuQA119: Overall Score | Overall Acc. | No-Img Score | No-Img Acc.
+    # Detect whether image questions were included by checking samples; when not,
+    # render "-" in Overall columns (text-only model, fair comparison via No-Img).
     for task in ("igakuqa", "igakuqa119"):
         d = results.get(task)
         if not d or "leaderboard" not in d:
             continue
         lb = d["leaderboard"]
+        image_included = any(s.get("has_image") for s in d.get("samples", []))
         out.append(f"### {task} (https://github.com/naoto-iwase/IgakuQA119 style)\n")
         cols = ["Entry", "Overall Score", "Overall Acc.", "No-Img Score", "No-Img Acc."]
         out.append("| " + " | ".join(cols) + " |")
         out.append("|" + "|".join(["---"] * len(cols)) + "|")
+        if image_included:
+            overall_score = lb["overall"]["score_str"]
+            overall_acc = lb["overall"]["accuracy_str"]
+        else:
+            overall_score = "-"
+            overall_acc = "-"
         out.append("| " + " | ".join([
             f"{label}",
-            lb["overall"]["score_str"],
-            lb["overall"]["accuracy_str"],
+            overall_score,
+            overall_acc,
             lb["no_image"]["score_str"],
             lb["no_image"]["accuracy_str"],
-        ]) + " |\n")
+        ]) + " |")
+        if not image_included:
+            out.append("\n(注: text-only モデルで画像問題は未評価のため Overall は `-`。No-Img 列で比較)\n")
+        else:
+            out.append("")
 
     # JMED-LLM: kappa(accuracy) per task, plus average (per their README)
     jmed_tasks = ["jmmlu_med", "crade", "rrtnm", "smdis", "jcsts"]
