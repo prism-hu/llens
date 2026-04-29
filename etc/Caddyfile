@@ -1,3 +1,12 @@
 :80 {
 	reverse_proxy localhost:8080
+
+	handle_errors {
+		@down expression `{err.status_code} == 502 || {err.status_code} == 503 || {err.status_code} == 504`
+		handle @down {
+			root * /etc/caddy/maintenance
+			rewrite * /index.html
+			file_server
+		}
+	}
 }
