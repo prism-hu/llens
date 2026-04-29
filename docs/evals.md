@@ -50,6 +50,34 @@ SGLang の `--reasoning-parser` を介して OpenAI互換APIの `reasoning_conte
 | IgakuQA119 (第119回) | 必修3点/一般1点、計500点満点 | Overall Score / Overall Acc. / No-Img Score / No-Img Acc. |
 | JMED-LLM (MCQ 5タスク) | JMMLU-Med, CRADE, RRTNM, SMDIS, JCSTS | `kappa(accuracy)`、CRADE/JCSTS は線形重み付き κ |
 
+#### Score と Acc. の分母
+
+| | 分子 | 分母 |
+|---|---|---|
+| **Score** | 正解した問題の `points_possible` 合計 | 出題された問題の `points_possible` 合計(配点制) |
+| **Acc.** | 正解した問題数 | 出題された問題数(無加重カウント) |
+
+Score は **必修問題が3点扱い**(IgakuQA119 では B/E ブロック Q26-50)なので、必修を落とすと Acc. より Score が大きく下がる。
+
+#### IgakuQA119 (第119回)
+
+- Overall: **400 問 / 500 点**
+- No-Img: **297 問 / 383 点**
+- 必修問題 (B/E ブロック): 100 問 / 200 点
+
+#### IgakuQA (2018-2022)、回ごと
+
+| 年 | 回 | Overall (問/点) | No-Img (問/点) |
+|---|---|---|---|
+| 2018 | 第112回 | 400 / 499 | 286 / 362 |
+| 2019 | 第113回 | 400 / 496 | 296 / 375 |
+| 2020 | 第114回 | 400 / 496 | 287 / 365 |
+| 2021 | 第115回 | 400 / 500 | 301 / 383 |
+| 2022 | 第116回 | 400 / 494 | 301 / 379 |
+| **計** | 5年合計 | **2000 / 2485** | **1471 / 1864** |
+
+`leaderboard_by_year` に年ごとの集計が、`leaderboard` に5年合算が入る。回ごとに必修・一般の数や配点が微妙に違うため Overall は完全な500点ではなく494〜500の幅がある(問題側の `points` フィールドをそのまま採用)。
+
 LLM-as-a-judge は本フェーズでは使わない(機械採点で完結する範囲に限定)。
 
 ## フェーズ
