@@ -1,8 +1,12 @@
 """Runner for IgakuQA (jungokasai/IgakuQA) — Japanese medical licensing exam.
 
 Five years (2018-2022), ~400 problems each. Multi-letter answers (e.g., "ac")
-are scored by exact set match. Image-bearing problems (text_only=False) are
-skipped by default.
+are scored by exact set match.
+
+Image-bearing problems (text_only=False) are always skipped: the original
+repository ships text content only — no image files are bundled — so vision
+evaluation is impossible here. For image evaluation use IgakuQA119 (which
+bundles images and supports auto vision probe).
 """
 
 from __future__ import annotations
@@ -111,15 +115,14 @@ def run(
     model: str,
     output_dir: Path,
     years: list[str],
-    include_image: bool,
     limit: int | None,
     no_think: bool,
     max_tokens: int,
     temperature: float,
 ) -> Path:
     problems = load_problems(years)
-    if not include_image:
-        problems = [p for p in problems if p.get("text_only", True)]
+    # Always skip image problems — no image files are bundled in the source repo.
+    problems = [p for p in problems if p.get("text_only", True)]
     if limit:
         problems = problems[:limit]
 
@@ -298,8 +301,6 @@ def main() -> int:
     parser.add_argument("--model", required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--years", nargs="+", default=ALL_YEARS, choices=ALL_YEARS)
-    parser.add_argument("--include-image", action="store_true",
-                        help="include problems with images (text_only=false). Default: skip.")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--no-think", action="store_true")
     parser.add_argument("--max-tokens", type=int, default=32768)
@@ -311,7 +312,6 @@ def main() -> int:
         model=args.model,
         output_dir=args.output_dir,
         years=args.years,
-        include_image=args.include_image,
         limit=args.limit,
         no_think=args.no_think,
         max_tokens=args.max_tokens,

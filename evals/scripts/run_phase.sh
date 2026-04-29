@@ -21,12 +21,14 @@ MODEL="$1"
 SUBDIR="$2"
 shift 2
 
-# Split args: --include-image is only valid for igakuqa / igakuqa119.
+# Vision capability is auto-probed inside igakuqa119 (sends one test image at
+# startup; falls back to text-only if rejected). --no-vision is a 119-only
+# override flag and is routed separately.
 COMMON_ARGS=()
-IMAGE_ARGS=()
+VISION_ARGS=()
 for arg in "$@"; do
   case "$arg" in
-    --include-image) IMAGE_ARGS+=("$arg") ;;
+    --no-vision) VISION_ARGS+=("$arg") ;;
     *) COMMON_ARGS+=("$arg") ;;
   esac
 done
@@ -47,8 +49,8 @@ run() {
 cd "$ROOT"
 
 run llm-jp-eval-subset -m evals.tasks.llm_jp_eval_subset.run --task all "${COMMON_ARGS[@]}"
-run igakuqa            -m evals.tasks.igakuqa.run            "${COMMON_ARGS[@]}" "${IMAGE_ARGS[@]}"
-run igakuqa119         -m evals.tasks.igakuqa119.run         "${COMMON_ARGS[@]}" "${IMAGE_ARGS[@]}"
+run igakuqa            -m evals.tasks.igakuqa.run            "${COMMON_ARGS[@]}"
+run igakuqa119         -m evals.tasks.igakuqa119.run         "${COMMON_ARGS[@]}" "${VISION_ARGS[@]}"
 run jmed-llm           -m evals.tasks.jmed_llm.run --task all "${COMMON_ARGS[@]}"
 
 echo

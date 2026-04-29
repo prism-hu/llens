@@ -156,12 +156,37 @@ def render_timeline(results: dict[str, dict[str, Any]], label: str) -> str:
     return header + "\n".join(lines) + "\n"
 
 
+def per_sample_decode_tok_s(s: dict[str, Any]) -> float | None:
+    """Decode rate over the whole generation (think + answer):
+    (reasoning_tokens + answer_tokens) / (total_time - ttft).
+    Returns None when timing/tokens are missing.
+    """
+    ttft = s.get("ttft_ms")
+    total = s.get("total_time_ms")
+    rt = (s.get("reasoning_tokens") or 0)
+    at = (s.get("answer_tokens") or 0)
+    n_tok = rt + at
+    if ttft is None or total is None or total <= ttft or n_tok == 0:
+        return None
+    return n_tok / ((total - ttft) / 1000)
+
+
+def decode_tok_s_stats(samples: list[dict[str, Any]]) -> dict[str, float | None]:
+    rates = sorted(r for r in (per_sample_decode_tok_s(s) for s in samples) if r is not None)
+    if not rates:
+        return {"median": None, "p90": None}
+    return {
+        "median": rates[len(rates) // 2],
+        "p90": rates[min(int(len(rates) * 0.9), len(rates) - 1)],
+    }
+
+
 def render_table(results: dict[str, dict[str, Any]], label: str) -> str:
     header = f"## {label}\n\n"
     cols = [
         "task", "n", "metric", "score",
-        "ttat_p50 (ms)", "ttat_p90 (ms)",
-        "think_p50", "answer_p50",
+        "tok/s p50", "ttat p50 (ms)", "ttat p90 (ms)",
+        "think p50", "answer p50",
     ]
     lines = ["| " + " | ".join(cols) + " |",
              "|" + "|".join(["---"] * len(cols)) + "|"]
@@ -177,11 +202,13 @@ def render_table(results: dict[str, dict[str, Any]], label: str) -> str:
         ttat = timing.get("ttat_ms") or {}
         think = tokens.get("reasoning_tokens") or {}
         ans = tokens.get("answer_tokens") or {}
+        rate = decode_tok_s_stats(d.get("samples", []))
         lines.append("| " + " | ".join([
             task,
             str(n),
             primary,
             f"{score:.3f}" if score is not None else "-",
+            f"{rate['median']:.1f}" if rate["median"] is not None else "-",
             fmt(ttat.get("median")),
             fmt(ttat.get("p90")),
             fmt(think.get("median")),

@@ -93,7 +93,7 @@ evals/
 |---|---|
 | `tasks.llm_jp_eval_subset` | `--task {jcommonsenseqa,jemhopqa,jsquad,mgsm,all}` |
 | `tasks.igakuqa` | `--years 2018 2019 ...` `--include-image` |
-| `tasks.igakuqa119` | `--blocks 119A 119B ...` `--include-image` |
+| `tasks.igakuqa119` | `--blocks 119A 119B ...` `--no-vision`(auto-probeをスキップして強制text-only) |
 | `tasks.jmed_llm` | `--task {jmmlu_med,crade,rrtnm,smdis,jcsts,all}` (`all` は smdis 除外、smdis は明示時のみ) |
 
 出力: `<output-dir>/<task>.json` — metrics、timing分布(median/p90/max)、token分布、全サンプル raw/extracted/正誤。
@@ -117,8 +117,14 @@ evals/
 ```
 
 引数の振り分け:
-- `--include-image` は `igakuqa` / `igakuqa119` だけに転送(他タスクは知らない)
+- `--no-vision` は `igakuqa119` だけに転送(他タスクは vision 概念が無い、または画像ファイル非同梱)
 - それ以外 (`--limit`, `--no-think`, `--max-tokens`, `--temperature`) は全タスクに転送
+
+**画像問題の扱い (auto-probe)**:
+- `igakuqa119` は起動時に red square 画像で multimodal capability を probe(応答に "red"/"赤" 含むかを判定)
+- vision OK: 画像問題を multimodal API で評価 (Overall 列が埋まる)
+- vision NG: 画像問題を自動スキップ (No-Img 列のみ)
+- `igakuqa` (2018-2022) は画像ファイル非同梱のため画像問題は常時スキップ
 
 注意: JCSTS は 3.6K行、CRADE は 1.6K行。フルランは数時間〜半日。
 SMDIS は 15K行で別格(~55時間、SNSスタイルで院内利用と乖離)のため `--task all` から除外済。
