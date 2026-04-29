@@ -37,6 +37,17 @@ TASKS = {
     "jcsts": "JCSTS",
 }
 
+# Tasks included in --task all. SMDIS is excluded by default: 15,360 行 /
+# ~55時間で他の一桁多く、SNS スタイル(模擬ツイート)で院内利用と乖離。
+# 個別に必要な時は明示的に --task smdis で回す。
+ALL_TASKS = [
+    "jmmlu_med",
+    "crade",
+    "rrtnm",
+    # "smdis",  # 大規模・低優先のため除外
+    "jcsts",
+]
+
 # Linear-weighted κ for ordinal labels (per JMED-LLM official leaderboard).
 # For RRTNM the staging axes are also ordinal. JMMLU-Med / SMDIS are nominal.
 LINEAR_WEIGHTED_TASKS = {"crade", "jcsts"}
@@ -327,7 +338,7 @@ def main() -> int:
     parser.add_argument("--temperature", type=float, default=0.0)
     args = parser.parse_args()
 
-    tasks = list(TASKS.keys()) if args.task == "all" else [args.task]
+    tasks = list(ALL_TASKS) if args.task == "all" else [args.task]
     for t in tasks:
         out = run_task(
             t,

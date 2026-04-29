@@ -94,7 +94,7 @@ evals/
 | `tasks.llm_jp_eval_subset` | `--task {jcommonsenseqa,jemhopqa,jsquad,mgsm,all}` |
 | `tasks.igakuqa` | `--years 2018 2019 ...` `--include-image` |
 | `tasks.igakuqa119` | `--blocks 119A 119B ...` `--include-image` |
-| `tasks.jmed_llm` | `--task {jmmlu_med,crade,rrtnm,smdis,jcsts,all}` |
+| `tasks.jmed_llm` | `--task {jmmlu_med,crade,rrtnm,smdis,jcsts,all}` (`all` は smdis 除外、smdis は明示時のみ) |
 
 出力: `<output-dir>/<task>.json` — metrics、timing分布(median/p90/max)、token分布、全サンプル raw/extracted/正誤。
 
@@ -120,7 +120,9 @@ evals/
 - `--include-image` は `igakuqa` / `igakuqa119` だけに転送(他タスクは知らない)
 - それ以外 (`--limit`, `--no-think`, `--max-tokens`, `--temperature`) は全タスクに転送
 
-注意: SMDIS は 15K行以上、JCSTS は 3.6K行、CRADE は 1.6K行。フルランは数時間〜半日。
+注意: JCSTS は 3.6K行、CRADE は 1.6K行。フルランは数時間〜半日。
+SMDIS は 15K行で別格(~55時間、SNSスタイルで院内利用と乖離)のため `--task all` から除外済。
+明示的に `--task smdis` で叩けば実行可能。
 本番ランの前に必ず `--limit N` で wiring を確認。
 
 ## 公開リーダーボードと並びの指標

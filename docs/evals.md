@@ -13,7 +13,7 @@
 | **llm-jp-eval** (短縮) | 日本語汎用(常識・QA・数学) | exact_match / char_f1 / 数値一致 | 4タスク (~6K問) |
 | **IgakuQA** (2018-2022) | 医師国家試験 5年分 | 配点(問題内蔵 `points`) + accuracy | 2000問 / 2485点 |
 | **IgakuQA119** (第119回) | 最新医師国家試験。学習データに含まれにくい新問 | 500点満点(必修3点) / Overall / No-Img | 400問 / 500点 |
-| **JMED-LLM** (MCQ 5) | 医療QA・分類・類似度 | `kappa(accuracy)`、CRADE/JCSTSは線形重み付き | 5タスク (~22K行) |
+| **JMED-LLM** (MCQ 4) | 医療QA・分類・類似度 | `kappa(accuracy)`、CRADE/JCSTSは線形重み付き | 4タスク (~7K行、SMDISは別格大型のため除外) |
 
 優先度: **IgakuQA119**(最新・リーク低) > **JMED-LLM**(実務タスク網羅) > llm-jp-eval(日本語汎用底力) > IgakuQA(年次トレンド確認)。
 
