@@ -1,11 +1,13 @@
-# 評価結果(暫定)
+# 評価結果
 
-**Phase 1 (GLM-5.1 thinking ON) 進行中**。本ドキュメントはランが完走する前の **暫定報告**です。完走後に上書き更新。
+各 Phase 完了ごとに追記。Phase 1 = GLM-5.1 thinking ON を 2026-04-28 〜 04-29 に実施。
+
+## Phase 1: GLM-5.1 thinking ON (完了)
 
 - 起動構成: `scripts/sglang-glm5.1.sh` (EAGLE spec decoding 有効、TP8、context 131072、FP8)
 - thinking ON、temperature=0、max_tokens=32768
-- 実行: 2026-04-28 ~ 進行中
-- 全11タスク中 **9タスク完了**(残: `smdis`, `jcsts`)
+- 実行: 2026-04-28 〜 04-29
+- **9タスク完了** (smdis / jcsts は本評価範囲から除外、理由は `docs/evals.md` 末尾)
 
 ## ハイライト
 
@@ -40,23 +42,25 @@
 
 (原リポジトリ jungokasai/IgakuQA は 2023年以降の活発なリーダーボード更新なし。比較対象は別途調査)
 
-### JMED-LLM (5タスク中3完了)
+### JMED-LLM (MCQ 3タスク)
 
-公式リーダーボード形式: `kappa(accuracy)`、CRADE/JCSTS は線形重み付き κ。
+公式リーダーボード形式: `kappa(accuracy)`、CRADE は線形重み付き κ。
 
 | Entry | jmmlu_med | crade | rrtnm | smdis | jcsts | Average |
 |---|---|---|---|---|---|---|
-| **GLM-5.1 (本検証、進行中)** | **0.89(0.92)** | **0.64(0.81)** | **0.89(0.92)** | (実行中) | (実行中) | (確定待ち) |
+| **GLM-5.1 (本検証)** | **0.89(0.92)** | **0.64(0.81)** | **0.89(0.92)** | 除外 | 除外 | (3タスクのみ) |
 | gpt-4o-2024-08-06 | 0.82(0.87) | 0.54(0.53) | 0.85(0.90) | 0.76(0.88) | 0.60(0.48) | 0.61(0.53)\* |
 | gpt-4o-mini-2024-07-18 | 0.77(0.83) | 0.21(0.37) | 0.58(0.71) | 0.56(0.78) | 0.57(0.51) | 0.52(0.48)\* |
 | gemma-2-9b-it | 0.52(0.64) | 0.33(0.42) | 0.54(0.68) | 0.62(0.81) | 0.16(0.24) | 0.49(0.46)\* |
 
-\* JMED-LLM 公式 Average は MCQ 5タスク + NER 3タスクの計8タスク平均。本検証は MCQ 5 のみ (NER 未実装)、直接比較不可。
+\* JMED-LLM 公式 Average は MCQ 5タスク + NER 3タスクの計8タスク平均。本検証は MCQ 3 のみ(SMDIS/JCSTS 除外、NER 未実装)で、直接比較不可。
 
-**現時点の3タスクで GPT-4o を全て上回っている**:
+**実施した3タスクで GPT-4o を全て上回り**:
 - jmmlu_med: +0.07 (κ)
 - crade: +0.10 (κ)
 - rrtnm: +0.04 (κ)
+
+SMDIS / JCSTS の除外理由は `docs/evals.md` 末尾の「補足: 本評価から除外したタスク」参照。両タスクは時間に余裕がある時に **3モデル(GLM-5.1 / DeepSeek V3.2 / Kimi K2.6)で改めて取得予定**。
 
 ### llm-jp-eval (短縮版)
 
@@ -86,7 +90,7 @@ H200x8、EAGLE spec decoding 有効、シングルクライアント。
 
 候補1である **GLM-5.1 が、日本語特化FT組や同規模クラスのオープンモデルを既存ベンチで広く上回り、フロンティア閉源モデル(Claude-Sonnet-4、Gemini系下位)に肉薄する水準** を text-only ベンチ (No-Img) で達成。
 
-院内デプロイ候補としての一次資料に十分なシグナルあり。本命の Kimi K2.6 (公式EAGLE3公開後)、比較対象の DeepSeek V3.2、think OFF版で同様にフルラン後、最終比較を行う。
+院内デプロイ候補としての一次資料に十分なシグナルあり。本命の Kimi K2.6 (vision 込みで Phase 4 実施)、比較対象の DeepSeek V3.2、GLM-5.1 think OFF版を同様にフルラン後、最終比較を行う。
 
 ## ステータス
 
@@ -99,8 +103,8 @@ H200x8、EAGLE spec decoding 有効、シングルクライアント。
 - [x] jmmlu_med
 - [x] crade
 - [x] rrtnm
-- [ ] smdis (実行中)
-- [ ] jcsts (実行中)
+- [-] smdis (本評価範囲から除外、`docs/evals.md` 末尾参照)
+- [-] jcsts (本評価範囲から除外、`docs/evals.md` 末尾参照)
 
 ## 備考
 
@@ -117,9 +121,11 @@ H200x8、EAGLE spec decoding 有効、シングルクライアント。
 
 GLM-5.1 (本検証) は No-Img Score 93.21% < No-Img Acc. 94.61% で、Acc. の方がやや高い = 必修を多めに外している傾向(ただし誤差レベル)。
 
-### なぜ Overall を出していないか
+### なぜ GLM-5.1 で Overall を出していないか
 
-text-only モデル(GLM/Kimi/DeepSeek)は画像問題が解けない。`--include-image` で実行すれば Overall (500点満点・400問) が埋まるが、画像問題は "見えないまま推測" となり ~25% (ランダム相当) しか取れない。Gemini-2.5-Pro 等は vision で画像を実際に解いて Overall 97% を出しているため、同じ列で並べるのはアンフェア。**No-Img 列で比較するのが text-only モデルにとって公正**。
+GLM-5.1 は text-only モデルで画像問題が解けない。runner の vision auto-probe で **vision NG → 画像問題スキップ** と自動判定し、結果 No-Img 列のみ埋まる。Gemini-2.5-Pro 等は vision で画像を実際に解いて Overall 97% を出しているため、text-only モデルと同じ列で並べるのはアンフェア。**No-Img 列で比較するのが text-only モデルにとって公正**。
+
+Kimi K2.6 (Phase 4) は MoonViT 内蔵で vision OK → Overall 列も埋まる予定。
 
 ### 評価条件
 

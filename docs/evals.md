@@ -13,17 +13,17 @@
 | **llm-jp-eval** (短縮) | 日本語汎用(常識・QA・数学) | exact_match / char_f1 / 数値一致 | 4タスク (~6K問) |
 | **IgakuQA** (2018-2022) | 医師国家試験 5年分 | 配点(問題内蔵 `points`) + accuracy | 2000問 / 2485点 |
 | **IgakuQA119** (第119回) | 最新医師国家試験。学習データに含まれにくい新問 | 500点満点(必修3点) / Overall / No-Img | 400問 / 500点 |
-| **JMED-LLM** (MCQ 4) | 医療QA・分類・類似度 | `kappa(accuracy)`、CRADE/JCSTSは線形重み付き | 4タスク (~7K行、SMDISは別格大型のため除外) |
+| **JMED-LLM** (MCQ 3) | 医療QA・症例ADE判定・読影TNM分類 | `kappa(accuracy)`、CRADEは線形重み付き | 3タスク (~3K行、SMDIS/JCSTS除外 → 末尾の補足参照) |
 
 優先度: **IgakuQA119**(最新・リーク低) > **JMED-LLM**(実務タスク網羅) > llm-jp-eval(日本語汎用底力) > IgakuQA(年次トレンド確認)。
 
-## 簡易スコア (Phase 1 = GLM-5.1 thinking ON、9/11 タスク完了、進行中)
+## 簡易スコア (Phase 1 = GLM-5.1 thinking ON、9タスク完了)
 
 | ベンチ | 結果 |
 |---|---|
 | IgakuQA119 No-Img | **357/383 (93.21%)** Score / **281/297 (94.61%)** Acc |
 | IgakuQA 5年合算 No-Img | **1742/1864 (93.45%)** Score / **1368/1471 (93.00%)** Acc |
-| JMED-LLM (3/5タスク完了) | jmmlu_med 0.89(0.92) / crade 0.64(0.81) / rrtnm 0.89(0.92) |
+| JMED-LLM | jmmlu_med 0.89(0.92) / crade 0.64(0.81) / rrtnm 0.89(0.92) |
 | JCommonsenseQA | 0.977 |
 | JEMHopQA | 0.658 |
 | JSQuAD | 0.812 |
@@ -77,7 +77,7 @@ SGLang の `--reasoning-parser` を介して OpenAI互換APIの `reasoning_conte
 | llm-jp-eval 短縮版 | JCommonsenseQA, JEMHopQA, JSQuAD, MGSM-ja | exact_match / char_f1 / mathematical_equivalence |
 | IgakuQA (2018-2022) | 医師国家試験 5年分 | 配点(問題内蔵 `points`) + accuracy、Overall/No-Img |
 | IgakuQA119 (第119回) | 必修3点/一般1点、計500点満点 | Overall Score / Overall Acc. / No-Img Score / No-Img Acc. |
-| JMED-LLM (MCQ 5タスク) | JMMLU-Med, CRADE, RRTNM, SMDIS, JCSTS | `kappa(accuracy)`、CRADE/JCSTS は線形重み付き κ |
+| JMED-LLM (MCQ 3タスク) | JMMLU-Med, CRADE, RRTNM | `kappa(accuracy)`、CRADE は線形重み付き κ |
 
 #### Score と Acc. の分母
 
@@ -168,3 +168,28 @@ evals/
 - **安全性**: PII漏洩・過剰拒否・プロンプトインジェクション
 
 これらは閉域化前後で別途追加。
+
+## 補足: 本評価から除外したタスク
+
+JMED-LLM の以下2タスクは Phase 1 で除外。Phase 2 以降も同様(全フェーズで揃える)。除外しても **個別タスク値は得られないが、JMED-LLM の MCQ 3タスク相対比較は成立**する。
+
+### SMDIS (除外)
+
+- **規模**: 15,360 行(他タスクの一桁多い、JMED-LLM 全体の 67%)
+- **試算コスト**: 13.7 s/q × 15,360 = **約 55 時間 / 1モデル**(全Phaseで ~220h)
+- **データ性質**: SNS模擬投稿(本物のSNSでもなく架空)から「投稿者が1日以内に X病だったか」を A/B 判定。87.5% が「B」(陰性)で **強くインバランス**、"全部B" 戦略で 87.5% acc 取れる
+- **院内利用との乖離**: SNSスタイル日本語で実カルテ・読影レポート・問診と別系統
+- **判断**: コスト過大 / 弱インバランス / 院内非関連の三重で除外
+
+### JCSTS (除外)
+
+- **規模**: 3,670 行 / 19.5 s/q × 3,670 = **約 20 時間 / 1モデル**(全Phaseで ~80h)
+- **データ性質**: 医療文の意味的類似度判定(6段階 ordinal、線形重み付き κ で評価)
+- **院内利用との乖離は小**: RAG/検索系の構築には類似度判定能力が必要
+- **判断材料**:
+  - 重要度 ★ (低)。類似度判定は他 MCQ で間接的に測れる
+  - GLM-5.1 で 19% 進捗時点の acc は 0.349(参考値、kappa 換算で公開LB GPT-4o 0.60 を下回る見込み)
+  - 「JMED-LLM 4タスク Average を出したい」という単一目的で ~80h は採算が合わない
+- **判断**: 個別タスク値だけ欲しい時は `--task jcsts` で個別実行可能、`--task all` には入れない
+
+両タスクとも `evals/tasks/jmed_llm/run.py` の `ALL_TASKS` リストでコメントアウト済み。**`--task all` を使う限り自動的にスキップ**される。明示すれば実行可能なので将来必要になれば復活可能。

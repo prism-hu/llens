@@ -94,7 +94,7 @@ evals/
 | `tasks.llm_jp_eval_subset` | `--task {jcommonsenseqa,jemhopqa,jsquad,mgsm,all}` |
 | `tasks.igakuqa` | `--years 2018 2019 ...` `--include-image` |
 | `tasks.igakuqa119` | `--blocks 119A 119B ...` `--no-vision`(auto-probeをスキップして強制text-only) |
-| `tasks.jmed_llm` | `--task {jmmlu_med,crade,rrtnm,smdis,jcsts,all}` (`all` は smdis 除外、smdis は明示時のみ) |
+| `tasks.jmed_llm` | `--task {jmmlu_med,crade,rrtnm,smdis,jcsts,all}` (`all` は smdis/jcsts 除外、両者明示時のみ実行可) |
 
 出力: `<output-dir>/<task>.json` — metrics、timing分布(median/p90/max)、token分布、全サンプル raw/extracted/正誤。
 
@@ -126,9 +126,10 @@ evals/
 - vision NG: 画像問題を自動スキップ (No-Img 列のみ)
 - `igakuqa` (2018-2022) は画像ファイル非同梱のため画像問題は常時スキップ
 
-注意: JCSTS は 3.6K行、CRADE は 1.6K行。フルランは数時間〜半日。
-SMDIS は 15K行で別格(~55時間、SNSスタイルで院内利用と乖離)のため `--task all` から除外済。
-明示的に `--task smdis` で叩けば実行可能。
+注意: フルランは数時間〜半日(CRADE 1.6K行、IgakuQA 5年合算 ~1.5K行 等)。
+SMDIS (15K行 / ~55h) と JCSTS (3.6K行 / ~20h) は重要度低・コスト過大のため
+`--task all` から除外済(理由は `docs/evals.md` 末尾参照)。
+明示的に `--task smdis` / `--task jcsts` で叩けば実行可能。
 本番ランの前に必ず `--limit N` で wiring を確認。
 
 ## 公開リーダーボードと並びの指標
@@ -182,10 +183,11 @@ uv run --group evals python evals/scripts/summarize.py evals/results/glm-5.1-thi
 - [x] `tasks/llm_jp_eval_subset/run.py` (jcommonsenseqa, jemhopqa, jsquad, mgsm)
 - [x] `tasks/igakuqa/run.py` (2018-2022、5年分)
 - [x] `tasks/igakuqa119/run.py` (第119回、A-F)
-- [x] `tasks/jmed_llm/run.py` (5 MCQタスク: jmmlu_med, crade, rrtnm, smdis, jcsts)
+- [x] `tasks/jmed_llm/run.py` (MCQ 3タスク: jmmlu_med, crade, rrtnm。smdis/jcsts は重要度低のため `--task all` から除外、明示時のみ実行可)
 - [x] `scripts/run_phase.sh` (全タスク連続実行)
 - [x] `scripts/summarize.py` (Markdown集約)
 - [ ] `harness/speed.py` (並列ロード時の TTFT/throughput 測定 — Phase 1 では per-request timing で代替)
-- [ ] JMED-LLM の重み付き Cohen's κ 計算 (CRADE/JCSTS、現状はaccuracyのみ; raw pred/goldは保存済み)
+- [x] JMED-LLM の Cohen's κ (CRADE は線形重み付き)
+- [ ] JMED-LLM の JCSTS 線形重み付き κ (現状 ALL_TASKS 除外、明示実行時のみ計算される)
 - [ ] JMED-LLM NER系 (CRNER/RRNER/NRNER)
 - [ ] `harness/accuracy.py` (3 ランナー共通部の抽出 — 任意)

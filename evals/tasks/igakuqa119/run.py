@@ -195,11 +195,13 @@ def probe_vision(base_url: str, model: str) -> bool:
         ],
     }]
     try:
-        r = generate(base_url, model, msg, max_tokens=32, timeout=60.0)
+        # reasoning モデルは thinking で max_tokens を消費するので余裕を持たせる
+        r = generate(base_url, model, msg, max_tokens=512, timeout=120.0)
     except Exception:
         return False
-    text = (r.content or "").lower()
-    return "red" in text or "赤" in text or "まっか" in text or "赤色" in r.content
+    # reasoning_content と content の両方を見て "red"/"赤" 系のキーワードを探す
+    full = ((r.reasoning_content or "") + " " + (r.content or "")).lower()
+    return "red" in full or "赤" in full or "まっか" in full
 
 
 def run(

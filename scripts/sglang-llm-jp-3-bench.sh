@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# llm-jp-3-8x13b 系(ベンチマーク比較用)。
+# llm-jp-3-8x13b 系(ベンチマーク比較用、シングルユーザー前提)。
 # Usage:   ./scripts/sglang-llm-jp-3-bench.sh {instruct3|sip-jmed}
-# Env:     CUDA_VISIBLE_DEVICES (default "0,1")  PORT (default 8000)
+# Env:     CUDA_VISIBLE_DEVICES (default "0")  PORT (default 8000)
 #
-# 同時並列で2モデル走らせる例(GPU 0-1 と 2-3 に分ける):
-#   CUDA_VISIBLE_DEVICES=0,1 PORT=8000 ./scripts/sglang-llm-jp-3-bench.sh instruct3 &
-#   CUDA_VISIBLE_DEVICES=2,3 PORT=8001 ./scripts/sglang-llm-jp-3-bench.sh sip-jmed  &
+# Default は TP=1 (GPU 1基)。94GB/141GB に収まり、NCCL コスト無しでデコード最速。
+# 並列実行する場合のみ GPU 増やす(同時 2 モデルは GPU 0 と GPU 1 に分けるなど):
+#   CUDA_VISIBLE_DEVICES=0 PORT=8000 ./scripts/sglang-llm-jp-3-bench.sh instruct3 &
+#   CUDA_VISIBLE_DEVICES=1 PORT=8001 ./scripts/sglang-llm-jp-3-bench.sh sip-jmed  &
 #   wait
 set -euo pipefail
 
@@ -24,7 +25,7 @@ case "${1:-}" in
     ;;
 esac
 
-GPUS="${CUDA_VISIBLE_DEVICES:-0,1}"
+GPUS="${CUDA_VISIBLE_DEVICES:-0}"
 TP=$(echo "$GPUS" | tr ',' '\n' | grep -c .)
 PORT="${PORT:-8000}"
 

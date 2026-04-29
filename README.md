@@ -319,27 +319,14 @@ uv run hf download llm-jp/llm-jp-3-8x13b-instruct3 --local-dir ./models/llm-jp-3
 uv run hf download SIP-med-LLM/SIP-jmed-llm-3-8x13b-OP-32k-R0.1 --local-dir ./models/SIP-jmed-llm-3-8x13b-OP-32k-R0.1
 ```
 
-起動 (共通スクリプト):
+起動 (共通スクリプト、デフォルト TP=1 / GPU 0 / port 8000):
 
 ```bash
-# 単独 (デフォルト GPU 0-1, port 8000)
-./scripts/sglang-llm-jp-3-bench.sh instruct3
-./scripts/sglang-llm-jp-3-bench.sh sip-jmed
-
-# 2モデル並列 (GPU 0-1 と 2-3 に分けて同時起動、port 別)
-CUDA_VISIBLE_DEVICES=0,1 PORT=8000 ./scripts/sglang-llm-jp-3-bench.sh instruct3 &
-CUDA_VISIBLE_DEVICES=2,3 PORT=8001 ./scripts/sglang-llm-jp-3-bench.sh sip-jmed  &
-wait
-
-# 並列 eval (各々別 base-url を指定)
-./evals/scripts/run_phase.sh llm-jp-3-8x13b-instruct3 llm-jp-instruct3 \
-  --base-url http://localhost:8000 &
-./evals/scripts/run_phase.sh sip-jmed-llm-3-8x13b sip-jmed \
-  --base-url http://localhost:8001 &
-wait
+./scripts/sglang-llm-jp-3-bench.sh instruct3   # llm-jp-3-8x13b-instruct3
+./scripts/sglang-llm-jp-3-bench.sh sip-jmed    # SIP-jmed-llm-3-8x13b
 ```
 
-> 8x13B MoE は全体 ~47B / FP16 ~94GB なので **TP=2 (=GPU 2基)** で十分。frontier モデル群と並走可能。
+> 8x13B MoE は ~47B / FP16 ~94GB なので **1 GPU(141GB) に収まる**。NCCL 通信コスト無しでデコード最速、シングルユーザー eval に最適。
 > TP は `CUDA_VISIBLE_DEVICES` の GPU 数から自動判定。
 >
 > 推奨サンプリング (モデルカード): `temperature 0.5`, `top_p 0.8`, `repeat_penalty 1.05`。

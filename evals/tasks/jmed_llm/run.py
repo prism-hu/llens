@@ -37,15 +37,18 @@ TASKS = {
     "jcsts": "JCSTS",
 }
 
-# Tasks included in --task all. SMDIS is excluded by default: 15,360 行 /
-# ~55時間で他の一桁多く、SNS スタイル(模擬ツイート)で院内利用と乖離。
-# 個別に必要な時は明示的に --task smdis で回す。
+# Tasks included in --task all. 除外:
+#   - smdis: 15,360 行 / ~55時間で他の一桁多く、SNS スタイル(模擬ツイート)で
+#            院内利用と乖離。
+#   - jcsts: 3,670 行 / ~20時間。文意味類似度判定は他タスクで間接的に測れる、
+#            重要度低 (★) でコスト過大。
+# 個別に必要な時は明示的に --task smdis / --task jcsts で回す。
 ALL_TASKS = [
     "jmmlu_med",
     "crade",
     "rrtnm",
-    # "smdis",  # 大規模・低優先のため除外
-    "jcsts",
+    # "smdis",  # 大規模・低優先
+    # "jcsts",  # 重要度低、~20時間コスト
 ]
 
 # Linear-weighted κ for ordinal labels (per JMED-LLM official leaderboard).
