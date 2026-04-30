@@ -17,14 +17,17 @@
 | OpenAI-o3 | 482/500 (96.40%) | 384/400 (96.00%) | 370/383 (96.61%) | 286/297 (96.30%) |
 | Claude-Sonnet-4 | 471/500 (94.20%) | 375/400 (93.75%) | 363/383 (94.78%) | 281/297 (94.61%) |
 | DeepSeek-R1-0528 | 461/500 (92.20%) | 367/400 (91.75%) | 364/383 (95.04%) | 282/297 (94.95%) |
+| **Kimi K2.6 (本検証 vision)** | **455/500 (91.00%)** | **367/400 (91.75%)** | **346/383 (90.34%)** | **272/297 (91.58%)** |
 | DeepSeek-R1 | 448/500 (89.60%) | 356/400 (89.00%) | 350/383 (91.38%) | 270/297 (90.91%) |
 | GPT-4o-mini | 345/500 (69.00%) | 279/400 (69.75%) | 269/383 (70.23%) | 215/297 (72.39%) |
 | (参考) Preferred-MedLLM-Qwen-72B (国産医療FT) | 332/500 (66.40%) | 272/400 (68.00%) | 261/383 (68.15%) | 209/297 (70.37%) |
 |   |   |   |   |   |
 | **GLM-5.1 (本検証 text-only)** | - | - | **357/383 (93.21%)** | **281/297 (94.61%)** |
-| **Kimi K2.6 (本検証 vision)** | (Phase 4 進行中) | | | |
 
-**GLM-5.1 (text-only) の No-Img Acc. は Claude-Sonnet-4 と完全同点**。Overall は text-only モデルなので "-"(画像問題は auto-skip)。**Kimi K2.6 (vision OK 検出済み) で Overall 列も埋まる予定** → Gemini 2.5 / o3 等の vision frontier モデルとの直接比較が可能になる。
+**観察**:
+- Kimi K2.6 (vision): Overall Score 455/500 (91.00%) — DeepSeek-R1-0528 (92.20%) と DeepSeek-R1 (89.60%) の間
+- GLM-5.1 (text-only): No-Img Acc 281/297 (94.61%) — Claude-Sonnet-4 (94.61%) と同点
+- 同じ No-Img 列で比較すると **GLM-5.1 (94.61%) > Kimi K2.6 (91.58%)** で約3pt 差
 
 ### JMED-LLM (MCQ 3タスク、`κ(accuracy)` 形式) — Avg κ で並び替え
 
@@ -36,8 +39,6 @@
 | gemma-2-9b-it | 0.52(0.64) | 0.33(0.42) | 0.54(0.68) | 0.463 |
 | (参考) Llama-3-ELYZA-JP-8B (国産日本語FT) | 0.34(0.51) | 0.01(0.26) | 0.29(0.52) | 0.213 |
 
-**GLM-5.1 が κ Average で全モデルを上回り 1位**。GPT-4o を含めて圧倒。
-
 JMED-LLM 公式 LB に Claude 4系/GPT-5/Gemini 2.5+ の評価は無く、現状 GPT-4o が最新クラウド baseline。SMDIS/JCSTS は除外(`SPEC.md`)。
 
 ### IgakuQA (2018-2022、5年合算) — No-Img
@@ -48,8 +49,6 @@ JMED-LLM 公式 LB に Claude 4系/GPT-5/Gemini 2.5+ の評価は無く、現状
 | **GLM-5.1 (本検証)** | **1742/1864 (93.45%)** | **1368/1471 (93.00%)** |
 | GPT-4 (2023, Kasai+) | 1557/1864 (83.53%) | 1213/1471 (82.46%) |
 | ChatGPT (2023, Kasai+) | 1093/1864 (58.64%) | 860/1471 (58.46%) |
-
-**GPT-4 (2023) を 10 ポイント上回り、医学生多数決にあと 2% まで肉薄**。
 
 注: Claude 4系 / GPT-5 / Gemini 2.5+ の IgakuQA 2018-2022 直接評価値は publicly に存在しない(2026-04 時点)。IgakuQA119 が最新クラウドモデルの比較ライン。
 
@@ -76,21 +75,21 @@ JMED-LLM 公式 LB に Claude 4系/GPT-5/Gemini 2.5+ の評価は無く、現状
 | jemhopqa | 3.3 | 5.1 | | |
 | jsquad | 3.1 | 3.6 | | |
 | mgsm | 3.1 | 5.6 | | |
-| igakuqa | 6.6 | (Phase 4 待ち) | | |
-| igakuqa119 | 6.6 | | | |
-| jmmlu_med | 5.0 | | | |
-| crade | 8.7 | | | |
-| rrtnm | 7.4 | | | |
+| igakuqa | 6.6 | (Phase 4 残り) | | |
+| igakuqa119 | 6.6 | 13.9 | | |
+| jmmlu_med | 5.0 | (Phase 4 残り) | | |
+| crade | 8.7 | (Phase 4 残り) | | |
+| rrtnm | 7.4 | (Phase 4 残り) | | |
 
 ### decode tok/s p50
 
 | Task | GLM-5.1 ON | Kimi K2.6 ON | DeepSeek V3.2 ON | GLM-5.1 OFF |
 |---|---:|---:|---:|---:|
-| jcommonsenseqa | 99.9 | (集計予定) | (Phase 2) | (Phase 3) |
-| jsquad | 111.5 | | | |
-| mgsm | 106.6 | | | |
-| igakuqa119 | 91.9 | | | |
-| crade | 89.1 | | | |
+| jcommonsenseqa | 99.9 | 78.1 | (Phase 2) | (Phase 3) |
+| jsquad | 111.5 | 78.0 | | |
+| mgsm | 106.6 | 77.8 | | |
+| igakuqa119 | 91.9 | 77.3 | | |
+| crade | 89.1 | (Phase 4 残り) | | |
 
 GLM-5.1 は EAGLE spec decoding 有効、Kimi K2.6 は EAGLE3 ドラフト未公開のため spec decoding 無し。EAGLE3 公開後に Kimi の速度のみ再ラン予定。
 

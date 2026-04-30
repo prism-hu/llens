@@ -22,13 +22,13 @@ SUBDIR="$2"
 shift 2
 
 # Vision capability is auto-probed inside igakuqa119 (sends one test image at
-# startup; falls back to text-only if rejected). --no-vision is a 119-only
-# override flag and is routed separately.
+# startup; falls back to text-only if rejected). --no-vision / --official は
+# 119-only のオプションなので個別ルーティング。
 COMMON_ARGS=()
-VISION_ARGS=()
+IGAKUQA119_ARGS=()
 for arg in "$@"; do
   case "$arg" in
-    --no-vision) VISION_ARGS+=("$arg") ;;
+    --no-vision|--official) IGAKUQA119_ARGS+=("$arg") ;;
     *) COMMON_ARGS+=("$arg") ;;
   esac
 done
@@ -50,7 +50,7 @@ cd "$ROOT"
 
 run llm-jp-eval-subset -m evals.tasks.llm_jp_eval_subset.run --task all "${COMMON_ARGS[@]}"
 run igakuqa            -m evals.tasks.igakuqa.run            "${COMMON_ARGS[@]}"
-run igakuqa119         -m evals.tasks.igakuqa119.run         "${COMMON_ARGS[@]}" "${VISION_ARGS[@]}"
+run igakuqa119         -m evals.tasks.igakuqa119.run         "${COMMON_ARGS[@]}" "${IGAKUQA119_ARGS[@]}"
 run jmed-llm           -m evals.tasks.jmed_llm.run --task all "${COMMON_ARGS[@]}"
 
 echo

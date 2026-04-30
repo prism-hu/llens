@@ -25,6 +25,7 @@ PRIMARY_METRIC = {
     "mgsm": "mathematical_equivalence",
     "igakuqa": "accuracy",
     "igakuqa119": "accuracy",
+    "igakuqa119_official": "accuracy",
     "jmmlu_med": "accuracy",
     "crade": "accuracy",
     "rrtnm": "accuracy",
@@ -71,7 +72,7 @@ def render_leaderboard(results: dict[str, dict[str, Any]], label: str) -> str:
     # IgakuQA / IgakuQA119: Overall Score | Overall Acc. | No-Img Score | No-Img Acc.
     # Detect whether image questions were included by checking samples; when not,
     # render "-" in Overall columns (text-only model, fair comparison via No-Img).
-    for task in ("igakuqa", "igakuqa119"):
+    for task in ("igakuqa", "igakuqa119", "igakuqa119_official"):
         d = results.get(task)
         if not d or "leaderboard" not in d:
             continue

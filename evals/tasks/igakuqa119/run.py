@@ -49,6 +49,33 @@ INSTRUCTION_NUMERIC = (
     "解答(数値)だけを <answer></answer> タグで囲んで返してください(例: <answer>42</answer>)。"
 )
 
+# `--official` モード: naoto-iwase/IgakuQA119 の src/llm_solver.py と同じ
+# system prompt + user prompt + 出力形式を採用。公式 LB と直接比較するための変種。
+OFFICIAL_SYSTEM_PROMPT = """\
+あなたは医師国家試験問題を解く優秀で論理的なアシスタントです。
+以下のルールを守って、問題文と選択肢(または数値入力の指示)を確認し、回答してください。
+
+【ルール】
+1. 明示的な指示がない場合は、単一選択肢のみ選ぶ(例: "a", "d")。
+2. 「2つ選べ」「3つ選べ」などとあれば、その数だけ選択肢をアルファベット順で列挙する(例: "ac", "bd")。
+3. 選択肢が存在せず数値入力が求められる場合は、指定がない限りそのままの数値を答える(例: answer: 42)。
+4. 画像(has_image=True)は参考情報とし、特別な形式は不要。
+5. 不要な装飾やMarkdown記法は含めず、以下の形式に従って厳密に出力してください:
+
+answer: [選んだ回答(単数/複数/数値)]
+confidence: [0.0〜1.0の確信度]
+explanation: [選択理由や重要な根拠を簡潔に]
+
+【answerについて注意】
+- 問題は単数選択、複数選択、数値入力のいずれかであり、問題文からその形式を判断する。
+- 「どれか。」で終わる選択問題で数が明記されていない場合は、五者択一を意味するので選択肢を必ず1つだけ選び小文字のアルファベットで回答する。(単数選択)
+- 「2つ選べ」「3つ選べ」などと書いてある場合に限り、指定された数だけの複数選択肢を選び、小文字のアルファベット順(abcde順)に並び替えて列挙する。(複数選択)
+- 選択肢が存在しない場合は、小数や四捨五入など、問題文で特に指示があればそれに従い、選択肢記号ではなく数値を回答する。(数値入力)
+- 問題に関連しない余計な文は書かず、指定のキー(answer, confidence, explanation)を上記の出力に従って厳密に出力する。
+"""
+
+OFFICIAL_ANSWER_RE = re.compile(r"^\s*answer\s*[:：]\s*(.+?)\s*$", re.MULTILINE | re.IGNORECASE)
+
 
 @dataclass
 class SampleResult:
@@ -110,35 +137,64 @@ def encode_data_url(path: Path) -> str:
 
 
 def build_messages(
-    problem: dict[str, Any], *, vision: bool
+    problem: dict[str, Any], *, vision: bool, official: bool = False
 ) -> tuple[list[dict[str, Any]], list[str]]:
     """Return (messages, image_filenames). image_filenames is empty unless
-    vision=True and the problem has images; used to record what was actually
-    sent to the model.
+    vision=True and the problem has images.
+
+    official=True: naoto-iwase/IgakuQA119 と同じ system + user 構成 + 出力形式。
     """
     is_numeric = not problem["choices"]
-    if is_numeric:
-        text = f"{INSTRUCTION_NUMERIC}\n\n問題: {problem['question']}"
+
+    if official:
+        if is_numeric:
+            text = f"問題:{problem['question']}\n\n回答を指定された形式で出力してください。"
+        else:
+            choices = "\n".join(problem["choices"])
+            text = (
+                f"問題:{problem['question']}\n\n"
+                f"選択肢:\n{choices}\n\n"
+                f"回答を指定された形式で出力してください。"
+            )
     else:
-        choices = "\n".join(problem["choices"])
-        text = f"{INSTRUCTION_MCQ}\n\n問題: {problem['question']}\n\n選択肢:\n{choices}"
+        if is_numeric:
+            text = f"{INSTRUCTION_NUMERIC}\n\n問題: {problem['question']}"
+        else:
+            choices = "\n".join(problem["choices"])
+            text = f"{INSTRUCTION_MCQ}\n\n問題: {problem['question']}\n\n選択肢:\n{choices}"
 
     image_filenames: list[str] = []
     if vision and problem.get("has_image", False):
         paths = find_image_paths(problem["number"])
         if paths:
-            content: list[dict[str, Any]] = [{"type": "text", "text": text}]
+            user_content: Any = [{"type": "text", "text": text}]
             for p in paths:
-                content.append({
+                user_content.append({
                     "type": "image_url",
                     "image_url": {"url": encode_data_url(p)},
                 })
                 image_filenames.append(p.name)
-            return [{"role": "user", "content": content}], image_filenames
-    return [{"role": "user", "content": text}], image_filenames
+        else:
+            user_content = text
+    else:
+        user_content = text
+
+    if official:
+        return [
+            {"role": "system", "content": OFFICIAL_SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ], image_filenames
+    return [{"role": "user", "content": user_content}], image_filenames
 
 
-def extract_match(text: str) -> str:
+def extract_match(text: str, *, official: bool = False) -> str:
+    if official:
+        m = OFFICIAL_ANSWER_RE.search(text)
+        if m:
+            return m.group(1).strip().strip('"\'`')
+        # fallback: タグ形式 / 全文
+        m2 = EXTRACT_RE.search(text)
+        return (m2.group(1).strip() if m2 else text).strip()
     m = EXTRACT_RE.search(text)
     return (m.group(1).strip() if m else text).strip()
 
@@ -215,6 +271,7 @@ def run(
     no_think: bool,
     max_tokens: int,
     temperature: float,
+    official: bool = False,
 ) -> Path:
     problems = load_problems()
     problems = [p for p in problems if p["block"] in blocks]
@@ -244,9 +301,10 @@ def run(
     correct_count = 0
     start_dt = datetime.datetime.now().astimezone()
 
-    pbar = tqdm(problems, desc="igakuqa119", unit="q")
+    desc = "igakuqa119_official" if official else "igakuqa119"
+    pbar = tqdm(problems, desc=desc, unit="q")
     for p in pbar:
-        msgs, image_files = build_messages(p, vision=vision_supported)
+        msgs, image_files = build_messages(p, vision=vision_supported, official=official)
         gen: GenerationResult = generate(
             base_url,
             model,
@@ -255,7 +313,7 @@ def run(
             max_tokens=max_tokens,
             extra_body=extra_body,
         )
-        extracted = extract_match(gen.content)
+        extracted = extract_match(gen.content, official=official)
         correct, ext_set = score(p, extracted)
         if correct:
             correct_count += 1
@@ -284,9 +342,10 @@ def run(
         pbar.set_postfix(acc=f"{correct_count / len(results):.3f}")
 
     end_dt = datetime.datetime.now().astimezone()
-    aggregate = aggregate_results(model, no_think, blocks, vision_supported, results, start_dt, end_dt)
+    task_name = "igakuqa119_official" if official else "igakuqa119"
+    aggregate = aggregate_results(model, no_think, blocks, vision_supported, results, start_dt, end_dt, task_name=task_name)
     output_dir.mkdir(parents=True, exist_ok=True)
-    out_path = output_dir / "igakuqa119.json"
+    out_path = output_dir / f"{task_name}.json"
     out_path.write_text(json.dumps(aggregate, ensure_ascii=False, indent=2))
     return out_path
 
@@ -345,6 +404,7 @@ def aggregate_results(
     samples: list[SampleResult],
     start_dt: datetime.datetime,
     end_dt: datetime.datetime,
+    task_name: str = "igakuqa119",
 ) -> dict[str, Any]:
     def stat(field: str) -> dict[str, float | None]:
         vals = [getattr(s, field) for s in samples]
@@ -362,7 +422,7 @@ def aggregate_results(
     leaderboard = compute_leaderboard(samples)
 
     return {
-        "task": "igakuqa119",
+        "task": task_name,
         "model": model,
         "mode": "think_off" if no_think else "think_on",
         "vision_used": vision_used,
@@ -427,6 +487,8 @@ def main() -> int:
     parser.add_argument("--blocks", nargs="+", default=ALL_BLOCKS, choices=ALL_BLOCKS)
     parser.add_argument("--no-vision", action="store_true",
                         help="vision capability の auto-probe をスキップし、画像問題を最初から除外する(text-only モデル前提)")
+    parser.add_argument("--official", action="store_true",
+                        help="naoto-iwase/IgakuQA119 公式 src/llm_solver.py と同じ system prompt + answer: 行形式に切替。出力は igakuqa119_official.json")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--no-think", action="store_true")
     parser.add_argument("--max-tokens", type=int, default=32768)
@@ -439,12 +501,14 @@ def main() -> int:
         output_dir=args.output_dir,
         blocks=args.blocks,
         no_vision=args.no_vision,
+        official=args.official,
         limit=args.limit,
         no_think=args.no_think,
         max_tokens=args.max_tokens,
         temperature=args.temperature,
     )
-    print(f"[done] igakuqa119 -> {out}")
+    label = "igakuqa119_official" if args.official else "igakuqa119"
+    print(f"[done] {label} -> {out}")
     return 0
 
 
