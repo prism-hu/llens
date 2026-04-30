@@ -26,6 +26,7 @@ PRIMARY_METRIC = {
     "igakuqa": "accuracy",
     "igakuqa119": "accuracy",
     "igakuqa119_official": "accuracy",
+    "jmle2026": "accuracy",
     "jmmlu_med": "accuracy",
     "crade": "accuracy",
     "rrtnm": "accuracy",
@@ -97,6 +98,34 @@ def render_leaderboard(results: dict[str, dict[str, Any]], label: str) -> str:
         ]) + " |")
         if not image_included:
             out.append("\n(注: text-only モデルで画像問題は未評価のため Overall は `-`。No-Img 列で比較)\n")
+        else:
+            out.append("")
+
+    # JMLE2026: Overall Score | Overall Acc. | Text-only Score | Text-only Acc.
+    # (matches https://github.com/naoto-iwase/JMLE2026-Bench leaderboard table)
+    d = results.get("jmle2026")
+    if d and "leaderboard" in d:
+        lb = d["leaderboard"]
+        image_included = any(s.get("has_image") for s in d.get("samples", []))
+        out.append("### jmle2026 (https://github.com/naoto-iwase/JMLE2026-Bench style)\n")
+        cols = ["Entry", "Overall Score", "Overall Acc.", "Text-only Score", "Text-only Acc."]
+        out.append("| " + " | ".join(cols) + " |")
+        out.append("|" + "|".join(["---"] * len(cols)) + "|")
+        if image_included:
+            overall_score = lb["overall"]["score_str"]
+            overall_acc = lb["overall"]["accuracy_str"]
+        else:
+            overall_score = "-"
+            overall_acc = "-"
+        out.append("| " + " | ".join([
+            f"{label}",
+            overall_score,
+            overall_acc,
+            lb["text_only"]["score_str"],
+            lb["text_only"]["accuracy_str"],
+        ]) + " |")
+        if not image_included:
+            out.append("\n(注: text-only モデルで画像問題は未評価のため Overall は `-`。Text-only 列で比較)\n")
         else:
             out.append("")
 

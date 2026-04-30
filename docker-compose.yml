@@ -10,12 +10,24 @@ services:
       - 'DEFAULT_PROMPT_SUGGESTIONS=[{"title":["はじめての方へ","LLENSの使い方"],"content":"はじめて使います。何ができるか教えてください。"}]'
       - ENABLE_FOLLOW_UP_GENERATION=false
       - ENABLE_AUTOCOMPLETE_GENERATION=false
+      - CONTENT_EXTRACTION_ENGINE=docling
+      - DOCLING_SERVER_URL=http://docling:5001
     volumes:
       - open-webui-data:/app/backend/data
     ports:
       - "8080:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      - docling
+    restart: unless-stopped
+
+  docling:
+    # CPU 版。GPU 版は SGLang が H200x8 を専有しているため使えない。
+    image: quay.io/docling-project/docling-serve:v1.17.0
+    container_name: llens-docling
+    ports:
+      - "5001:5001"
     restart: unless-stopped
 
   dcgm-exporter:

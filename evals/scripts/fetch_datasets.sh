@@ -19,10 +19,11 @@ clone_or_skip() {
   git clone --depth 1 "$url" "$DATA/$target"
 }
 
-clone_or_skip https://github.com/jungokasai/IgakuQA.git      igakuqa
-clone_or_skip https://github.com/naoto-iwase/IgakuQA119.git  igakuqa119
-clone_or_skip https://github.com/sociocom/JMED-LLM.git       jmed_llm
-clone_or_skip https://github.com/llm-jp/llm-jp-eval.git      llm_jp_eval
+clone_or_skip https://github.com/jungokasai/IgakuQA.git           igakuqa
+clone_or_skip https://github.com/naoto-iwase/IgakuQA119.git       igakuqa119
+clone_or_skip https://github.com/naoto-iwase/JMLE2026-Bench.git   jmle2026
+clone_or_skip https://github.com/sociocom/JMED-LLM.git            jmed_llm
+clone_or_skip https://github.com/llm-jp/llm-jp-eval.git           llm_jp_eval
 
 cat <<'NOTE'
 

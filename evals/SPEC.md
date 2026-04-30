@@ -19,10 +19,11 @@
 |---|---|---|---|
 | **llm-jp-eval** (短縮) | 日本語汎用(常識・QA・数学) | exact_match / char_f1 / 数値一致 | 4タスク (~6K問) |
 | **IgakuQA** (2018-2022) | 医師国家試験 5年分 | 配点(問題内蔵 `points`) + accuracy | 2000問 / 2485点 |
-| **IgakuQA119** (第119回) | 最新医師国家試験。学習データに含まれにくい新問 | 500点満点(必修3点)/ Overall / No-Img | 400問 / 500点 |
+| **IgakuQA119** (第119回) | 第119回医師国家試験 (2025/2 実施) | 500点満点(必修3点)/ Overall / No-Img | 400問 / 500点 |
+| **JMLE2026** (第120回) | 最新医師国家試験 (2026/2 実施)。学習データ完全未含有 | 500点満点(必修3点)/ Overall / Text-only | 400問 / 500点 |
 | **JMED-LLM** (MCQ 3) | 医療QA・症例ADE判定・読影TNM分類 | `kappa(accuracy)`、CRADE は線形重み付き | 3タスク (~3K行) |
 
-優先度: **IgakuQA119**(最新・リーク低) > **JMED-LLM**(実務タスク網羅) > llm-jp-eval(日本語汎用底力) > IgakuQA(年次トレンド確認)。
+優先度: **JMLE2026**(直近・完全リーク無) > **IgakuQA119**(リーク低) > **JMED-LLM**(実務タスク網羅) > llm-jp-eval(日本語汎用底力) > IgakuQA(年次トレンド確認)。
 
 ## ベンチ詳細
 
@@ -88,6 +89,33 @@ HF 認証は不要(JCQA/JEMHopQA/JSQuAD は GitHub raw、MGSM-ja は HF だが o
 
 A/D は画像率が高い(A=55%、D=57%が画像)。
 
+### JMLE2026 (第120回)
+
+[`naoto-iwase/JMLE2026-Bench`](https://github.com/naoto-iwase/JMLE2026-Bench) — 第120回医師国家試験 (2026/2 実施)。学習データに含まれない最新国試。
+
+**プロンプト**: 公式 `benchmark.py` をそのまま採用 (system 2種 + `【回答】` 抽出) → 公開LBに直接並べられる。
+
+**スコアリング規則** (IgakuQA119 と同じ):
+- 必修問題 (B/E ブロック): Q1-25 = 1点、Q26-50 = 3点
+- 一般問題 (A/C/D/F): 1点
+- 計500点満点 / 400問
+
+**ブロック別**:
+
+| ブロック | 種別 | 問数 | 配点 |
+|---|---|---:|---:|
+| 120A | 一般 | 75 | 75 |
+| 120B | 必修 | 50 | 100 |
+| 120C | 一般 | 75 | 75 |
+| 120D | 一般 | 75 | 75 |
+| 120E | 必修 | 50 | 100 |
+| 120F | 一般 | 75 | 75 |
+| **計** | | **400** | **500** |
+
+画像問題 98問 / Text-only 302問。連問 (`serial_group`) が50問あり、共通 `context_text` を user prompt に prepend。
+
+**LB提出**: 結果JSONに `submission` キーで公式の `metadata`/`summary`/`results` 形式を同梱済み。`jq '.submission' jmle2026.json > <model>.json` で公式 PR にそのまま使える。
+
 ### JMED-LLM (MCQ 3タスク)
 
 [`sociocom/JMED-LLM`](https://github.com/sociocom/JMED-LLM) のうち 3タスクを採用:
@@ -131,6 +159,7 @@ reasoning モデル考慮で `max_tokens=512` に余裕を持たせ、`reasoning
 | ベンチ | 形式 | 例 |
 |---|---|---|
 | IgakuQA / IgakuQA119 | `Overall Score` / `Overall Acc.` / `No-Img Score` / `No-Img Acc.` | `461/500 (92.20%)` |
+| JMLE2026 | `Overall Score` / `Overall Acc.` / `Text-only Score` / `Text-only Acc.` | `486/500 (97.20%)` |
 | JMED-LLM | `kappa(accuracy)`、CRADE は線形重み付き κ | `0.54(0.53)` |
 | llm-jp-eval | exact_match / char_f1 / mathematical_equivalence | `0.823` |
 
@@ -176,7 +205,8 @@ SGLang の `--reasoning-parser` で OpenAI互換APIの `reasoning_content` / `co
 |---|---|
 | `tasks.llm_jp_eval_subset` | `--task {jcommonsenseqa,jemhopqa,jsquad,mgsm,all}` |
 | `tasks.igakuqa` | `--years 2018 2019 ...` |
-| `tasks.igakuqa119` | `--blocks 119A 119B ...` `--no-vision`(auto-probe強制スキップ) |
+| `tasks.igakuqa119` | `--blocks 119A 119B ...` `--no-vision`(auto-probe強制スキップ) `--official` |
+| `tasks.jmle2026` | `--blocks A B ...` `--no-vision`(auto-probe強制スキップ) |
 | `tasks.jmed_llm` | `--task {jmmlu_med,crade,rrtnm,smdis,jcsts,all}` (`all` は smdis/jcsts 除外、両者明示時のみ実行可) |
 
 出力: `<output-dir>/<task>.json` — metrics、timing 分布、token 分布、`leaderboard`、全サンプル raw/extracted/正誤、started_at / ended_at。
@@ -196,10 +226,11 @@ SGLang の `--reasoning-parser` で OpenAI互換APIの `reasoning_content` / `co
 ```
 
 引数振り分け:
-- `--no-vision` は `igakuqa119` だけに転送
+- `--no-vision` は `igakuqa119` と `jmle2026` に転送 (両者とも vision タスク)
+- `--official` は `igakuqa119` だけに転送 (JMLE2026 は default が公式形式なので不要)
 - それ以外 (`--limit`, `--no-think`, `--max-tokens`, `--temperature`, `--base-url`) は全タスクに転送
 
-実行されるタスク: `llm-jp-eval-subset` の4タスク + `igakuqa` + `igakuqa119` + `jmed-llm` の3タスク = **計9タスク**。
+実行されるタスク: `llm-jp-eval-subset` の4タスク + `igakuqa` + `igakuqa119` + `jmle2026` + `jmed-llm` の3タスク = **計10タスク**。
 
 ### 結果集計 (`scripts/summarize.py`)
 
