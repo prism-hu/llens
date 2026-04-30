@@ -5,7 +5,10 @@
 
 - 評価仕様の詳細(ベンチ規模、採点ルール、ランナー仕様): [`SPEC.md`](./SPEC.md)
 
-## 結果サマリ (最新: Phase 1 = GLM-5.1 thinking ON、9タスク完了)
+## 結果サマリ
+
+- Phase 1 (GLM-5.1 thinking ON): 9タスク完了 (2026-04-29)
+- Phase 4 (Kimi K2.6 thinking ON): 5タスク完了 (jcommonsenseqa/jemhopqa/jsquad/mgsm/igakuqa119、2026-04-30)、医療系4タスク残
 
 ### IgakuQA119 (第119回医師国家試験)
 
@@ -54,12 +57,12 @@ JMED-LLM 公式 LB に Claude 4系/GPT-5/Gemini 2.5+ の評価は無く、現状
 
 ### llm-jp-eval (短縮版)
 
-| Task | GLM-5.1 |
-|---|---|
-| JCommonsenseQA (exact_match) | 0.977 |
-| JEMHopQA (exact_match) | 0.658 |
-| JSQuAD (exact_match) | 0.812 |
-| MGSM-ja (math_equiv) | 0.432 |
+| Task | GLM-5.1 | Kimi K2.6 |
+|---|---|---|
+| JCommonsenseQA (exact_match) | 0.977 | 0.979 |
+| JEMHopQA (exact_match / char_f1) | 0.658 / - | 0.617 / 0.747 |
+| JSQuAD (exact_match / char_f1) | 0.812 / - | 0.806 / 0.912 |
+| MGSM-ja (math_equiv) | 0.432 | **0.904** |
 
 比較相手は **未補強**(Nejumi LB は評価条件が異なり直接引用不可)。後日 OpenRouter 等の OpenAI 互換エンドポイント経由で Claude/GPT/Gemini を本ハーネスから叩いて apples-to-apples 値を埋める方針。
 
