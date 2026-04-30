@@ -4,7 +4,6 @@
 公開リーダーボード(IgakuQA119, JMED-LLM, llm-jp-eval系)と同形式で計測。
 
 - 評価仕様の詳細(ベンチ規模、採点ルール、ランナー仕様): [`SPEC.md`](./SPEC.md)
-- フェーズ進捗・各Phaseの完全な結果: [`docs/eval_results.md`](../docs/eval_results.md)
 
 ## 結果サマリ (最新: Phase 1 = GLM-5.1 thinking ON、9タスク完了)
 
@@ -52,7 +51,7 @@ JMED-LLM 公式 LB に Claude 4系/GPT-5/Gemini 2.5+ の評価は無く、現状
 
 **GPT-4 (2023) を 10 ポイント上回り、医学生多数決にあと 2% まで肉薄**。
 
-注: Claude 4系 / GPT-5 / Gemini 2.5+ の IgakuQA 2018-2022 直接評価値は publicly に存在しない(2026-04 時点)。IgakuQA119 が最新クラウドモデルの比較ライン。詳細は `docs/eval_results.md`。
+注: Claude 4系 / GPT-5 / Gemini 2.5+ の IgakuQA 2018-2022 直接評価値は publicly に存在しない(2026-04 時点)。IgakuQA119 が最新クラウドモデルの比較ライン。
 
 ### llm-jp-eval (短縮版)
 
@@ -65,7 +64,35 @@ JMED-LLM 公式 LB に Claude 4系/GPT-5/Gemini 2.5+ の評価は無く、現状
 
 比較相手は **未補強**(Nejumi LB は評価条件が異なり直接引用不可)。後日 OpenRouter 等の OpenAI 互換エンドポイント経由で Claude/GPT/Gemini を本ハーネスから叩いて apples-to-apples 値を埋める方針。
 
-詳細・公開LBの全行・含意・速度値・備考は **[`docs/eval_results.md`](../docs/eval_results.md)** 参照。
+## 速度参考(TTAT 中央値・decode tok/s 中央値、シングルクライアント)
+
+各 Phase の起動構成は対応する `scripts/sglang-*.sh` を参照(EAGLE 有無等で差あり)。
+
+### TTAT p50 (秒)
+
+| Task | GLM-5.1 ON | Kimi K2.6 ON | DeepSeek V3.2 ON | GLM-5.1 OFF |
+|---|---:|---:|---:|---:|
+| jcommonsenseqa | 1.8 | 2.9 | (Phase 2) | (Phase 3) |
+| jemhopqa | 3.3 | 5.1 | | |
+| jsquad | 3.1 | 3.6 | | |
+| mgsm | 3.1 | 5.6 | | |
+| igakuqa | 6.6 | (Phase 4 待ち) | | |
+| igakuqa119 | 6.6 | | | |
+| jmmlu_med | 5.0 | | | |
+| crade | 8.7 | | | |
+| rrtnm | 7.4 | | | |
+
+### decode tok/s p50
+
+| Task | GLM-5.1 ON | Kimi K2.6 ON | DeepSeek V3.2 ON | GLM-5.1 OFF |
+|---|---:|---:|---:|---:|
+| jcommonsenseqa | 99.9 | (集計予定) | (Phase 2) | (Phase 3) |
+| jsquad | 111.5 | | | |
+| mgsm | 106.6 | | | |
+| igakuqa119 | 91.9 | | | |
+| crade | 89.1 | | | |
+
+GLM-5.1 は EAGLE spec decoding 有効、Kimi K2.6 は EAGLE3 ドラフト未公開のため spec decoding 無し。EAGLE3 公開後に Kimi の速度のみ再ラン予定。
 
 ## 簡易使い方
 

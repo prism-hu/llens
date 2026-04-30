@@ -1,7 +1,7 @@
 # 評価仕様
 
 `evals/` ハーネスのベンチ詳細・採点ルール・ランナー仕様。
-最新の結果は [`README.md`](./README.md)、フェーズ進捗・全結果は [`docs/eval_results.md`](../docs/eval_results.md)。
+最新の結果は [`README.md`](./README.md)。
 
 ## 評価方針: as-released best
 
