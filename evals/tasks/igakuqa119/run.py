@@ -49,8 +49,9 @@ INSTRUCTION_NUMERIC = (
     "解答(数値)だけを <answer></answer> タグで囲んで返してください(例: <answer>42</answer>)。"
 )
 
-# `--official` モード: naoto-iwase/IgakuQA119 の src/llm_solver.py と同じ
-# system prompt + user prompt + 出力形式を採用。公式 LB と直接比較するための変種。
+# Default モード: naoto-iwase/IgakuQA119 の src/llm_solver.py と同じ
+# system prompt + user prompt + 出力形式を採用。公式 LB と直接比較可能。
+# `--legacy` で旧 `<answer>` タグ形式に切替 (歴史的互換用)。
 OFFICIAL_SYSTEM_PROMPT = """\
 あなたは医師国家試験問題を解く優秀で論理的なアシスタントです。
 以下のルールを守って、問題文と選択肢(または数値入力の指示)を確認し、回答してください。
@@ -271,8 +272,11 @@ def run(
     no_think: bool,
     max_tokens: int,
     temperature: float,
-    official: bool = False,
+    legacy: bool = False,
 ) -> Path:
+    # Default = `naoto-iwase/IgakuQA119` 公式形式 (LB直接比較可)。
+    # `--legacy` 指定時のみ独自 `<answer>` タグ形式。
+    official = not legacy
     problems = load_problems()
     problems = [p for p in problems if p["block"] in blocks]
 
@@ -301,7 +305,7 @@ def run(
     correct_count = 0
     start_dt = datetime.datetime.now().astimezone()
 
-    desc = "igakuqa119_official" if official else "igakuqa119"
+    desc = "igakuqa119_legacy" if legacy else "igakuqa119"
     pbar = tqdm(problems, desc=desc, unit="q")
     for p in pbar:
         msgs, image_files = build_messages(p, vision=vision_supported, official=official)
@@ -342,7 +346,7 @@ def run(
         pbar.set_postfix(acc=f"{correct_count / len(results):.3f}")
 
     end_dt = datetime.datetime.now().astimezone()
-    task_name = "igakuqa119_official" if official else "igakuqa119"
+    task_name = "igakuqa119_legacy" if legacy else "igakuqa119"
     aggregate = aggregate_results(model, no_think, blocks, vision_supported, results, start_dt, end_dt, task_name=task_name)
     output_dir.mkdir(parents=True, exist_ok=True)
     out_path = output_dir / f"{task_name}.json"
@@ -487,8 +491,8 @@ def main() -> int:
     parser.add_argument("--blocks", nargs="+", default=ALL_BLOCKS, choices=ALL_BLOCKS)
     parser.add_argument("--no-vision", action="store_true",
                         help="vision capability の auto-probe をスキップし、画像問題を最初から除外する(text-only モデル前提)")
-    parser.add_argument("--official", action="store_true",
-                        help="naoto-iwase/IgakuQA119 公式 src/llm_solver.py と同じ system prompt + answer: 行形式に切替。出力は igakuqa119_official.json")
+    parser.add_argument("--legacy", action="store_true",
+                        help="独自 `<answer>` タグ形式で実行 (旧 default、歴史的互換用)。default は naoto-iwase/IgakuQA119 公式 LB 形式。出力は igakuqa119_legacy.json")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--no-think", action="store_true")
     parser.add_argument("--max-tokens", type=int, default=32768)
@@ -501,13 +505,13 @@ def main() -> int:
         output_dir=args.output_dir,
         blocks=args.blocks,
         no_vision=args.no_vision,
-        official=args.official,
+        legacy=args.legacy,
         limit=args.limit,
         no_think=args.no_think,
         max_tokens=args.max_tokens,
         temperature=args.temperature,
     )
-    label = "igakuqa119_official" if args.official else "igakuqa119"
+    label = "igakuqa119_legacy" if args.legacy else "igakuqa119"
     print(f"[done] {label} -> {out}")
     return 0
 

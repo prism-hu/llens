@@ -68,7 +68,9 @@ HF 認証は不要(JCQA/JEMHopQA/JSQuAD は GitHub raw、MGSM-ja は HF だが o
 
 ### IgakuQA119 (第119回)
 
-[`naoto-iwase/IgakuQA119`](https://github.com/naoto-iwase/IgakuQA119) — 最新国試 (2025/2 実施)。OCR済みテキスト + 画像本体(`images/`)同梱。
+[`naoto-iwase/IgakuQA119`](https://github.com/naoto-iwase/IgakuQA119) — 第119回国試 (2025/2 実施)。OCR済みテキスト + 画像本体(`images/`)同梱。
+
+**プロンプト**: default は `naoto-iwase/IgakuQA119` 公式 `src/llm_solver.py` 形式 (system + `answer:`/`confidence:`/`explanation:` 行) → 公開LB直接比較可。`--legacy` で旧独自形式 (`<answer>` タグ抽出) にフォールバック (出力は `igakuqa119_legacy.json`)。
 
 **スコアリング規則**:
 - 必修問題 (B/E ブロック): Q1-25 = 1点、**Q26-50 = 3点**
@@ -205,7 +207,7 @@ SGLang の `--reasoning-parser` で OpenAI互換APIの `reasoning_content` / `co
 |---|---|
 | `tasks.llm_jp_eval_subset` | `--task {jcommonsenseqa,jemhopqa,jsquad,mgsm,all}` |
 | `tasks.igakuqa` | `--years 2018 2019 ...` |
-| `tasks.igakuqa119` | `--blocks 119A 119B ...` `--no-vision`(auto-probe強制スキップ) `--official` |
+| `tasks.igakuqa119` | `--blocks 119A 119B ...` `--no-vision`(auto-probe強制スキップ) `--legacy`(旧 `<answer>` タグ形式) |
 | `tasks.jmle2026` | `--blocks A B ...` `--no-vision`(auto-probe強制スキップ) |
 | `tasks.jmed_llm` | `--task {jmmlu_med,crade,rrtnm,smdis,jcsts,all}` (`all` は smdis/jcsts 除外、両者明示時のみ実行可) |
 
@@ -227,7 +229,7 @@ SGLang の `--reasoning-parser` で OpenAI互換APIの `reasoning_content` / `co
 
 引数振り分け:
 - `--no-vision` は `igakuqa119` と `jmle2026` に転送 (両者とも vision タスク)
-- `--official` は `igakuqa119` だけに転送 (JMLE2026 は default が公式形式なので不要)
+- `--legacy` は `igakuqa119` だけに転送 (旧 `<answer>` タグ形式へのフォールバック)
 - それ以外 (`--limit`, `--no-think`, `--max-tokens`, `--temperature`, `--base-url`) は全タスクに転送
 
 実行されるタスク: `llm-jp-eval-subset` の4タスク + `igakuqa` + `igakuqa119` + `jmle2026` + `jmed-llm` の3タスク = **計10タスク**。

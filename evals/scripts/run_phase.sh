@@ -23,14 +23,14 @@ shift 2
 
 # Vision capability is auto-probed inside igakuqa119 / jmle2026 (sends one test
 # image at startup; falls back to text-only if rejected).
-# --no-vision は両 vision タスクに転送、--official は igakuqa119 のみ。
+# --no-vision は両 vision タスクに転送、--legacy は igakuqa119 のみ。
 COMMON_ARGS=()
 VISION_ARGS=()
 IGAKUQA119_ONLY_ARGS=()
 for arg in "$@"; do
   case "$arg" in
     --no-vision) VISION_ARGS+=("$arg") ;;
-    --official) IGAKUQA119_ONLY_ARGS+=("$arg") ;;
+    --legacy) IGAKUQA119_ONLY_ARGS+=("$arg") ;;
     *) COMMON_ARGS+=("$arg") ;;
   esac
 done
