@@ -7,18 +7,17 @@
 
 ## 結果サマリ
 
-スコープは新ベンチセット 10タスク (`legacy` 計測値は補助、本表からは外す):
+10タスク (llm-jp-eval-subset 4 + 国試 3 + JMED-LLM 3):
 
-| タスク | Kimi K2.6 (Phase 4) | GLM-5.1 (Phase 1) |
+| タスク | Kimi K2.6 | GLM-5.1 |
 |---|---|---|
 | jcommonsenseqa / jemhopqa / jsquad / mgsm | ✓ | ✓ |
-| igakuqa (2018-2022) | — (未着手、途中で停止) | ✓ |
-| **igakuqa119** (公式形式) | ✓ | ❌ 新 default で再ラン待ち |
-| **jmle2026** | ✓ | ❌ 未実行 |
+| igakuqa (2018-2022) | ❌ 未実行 | ❌ 再ラン待ち |
+| igakuqa119 | ✓ | ❌ 再ラン待ち |
+| jmle2026 | ✓ | ❌ 未実行 |
 | jmmlu_med / crade / rrtnm | ✓ | ✓ |
 
-- Phase 1 完了日: 2026-04-29 (igakuqa119 は legacy のみ)
-- Phase 4 完了日: 2026-05-01 (igakuqa はリーク確実視 & 時間コスト過大で skip 判断)
+GLM-5.1 の igakuqa / igakuqa119 は旧プロンプト/旧 scope での測定値があったが、ハーネス清書 (画像問題盲解き込み・公式LBプロンプト統一) のタイミングで破棄。再ラン待ち。
 
 ### JMLE2026 (第120回医師国家試験、2026/2 実施)
 
@@ -67,7 +66,7 @@
 
 ### IgakuQA119 (第119回医師国家試験)
 
-公式LB の 4列形式(Overall + No-Img)。**default = 公式LB と同じプロンプト形式 (`naoto-iwase/IgakuQA119` `src/llm_solver.py` 準拠、`answer:` 行抽出)**。Llama 系省略、国産は参考:
+公式LB の 4列形式(Overall + No-Img)。プロンプトは `naoto-iwase/IgakuQA119` `src/llm_solver.py` 準拠 (公開LB直接比較可)。Llama 系省略、国産は参考:
 
 | Entry | Overall Score | Overall Acc. | No-Img Score | No-Img Acc. |
 |---|---|---|---|---|
@@ -82,38 +81,21 @@
 
 出典: [naoto-iwase/IgakuQA119](https://github.com/naoto-iwase/IgakuQA119) leaderboard (本検証行除く)
 
-**参考: `--legacy` (旧独自プロンプト `<answer>` タグ抽出) 測定値** — 公式LB との直接比較は不可。プロンプト形式の影響を見るため:
+**Kimi K2.6 内訳** (本検証):
 
-| Entry | Overall Score | Overall Acc. | No-Img Score | No-Img Acc. |
-|---|---|---|---|---|
-| Kimi K2.6 (vision、legacy) | 455/500 (91.00%) | 367/400 (91.75%) | 346/383 (90.34%) | 272/297 (91.58%) |
-| GLM-5.1 (text-only、legacy) ※新 default で再ラン待ち | - | - | 357/383 (93.21%) | 281/297 (94.61%) |
-
-**内訳** (本検証):
-
-| カテゴリ | Kimi K2.6 (default vision) | GLM-5.1 (legacy text-only) |
+| カテゴリ | Score | Acc. |
 |---|---|---|
-| 必修 (B+E、200点満点) | 182/200 (91.00%) / acc 92/100 | — (text-only のため画像問題未評価) |
-| 一般 (A+C+D+F、300点満点) | 283/300 (94.33%) | — |
-| 必修 (No-Img、175点) | 158/175 (90.29%) / acc 82/89 (92.13%) | 158/175 (90.29%) / acc 82/89 (92.13%) |
+| 必修 (B+E、200点満点) | 182/200 (91.00%) | 92/100 (92.00%) |
+| 一般 (A+C+D+F、300点満点) | 283/300 (94.33%) | 283/300 (94.33%) |
+| 必修 (No-Img、175点) | 158/175 (90.29%) | 82/89 (92.13%) |
 | 一般 (No-Img、208点) | 199/208 (95.67%) | 199/208 (95.67%) |
 
-ブロック別正答率:
-
-| ブロック | Kimi K2.6 | GLM-5.1 (No-Img) |
-|---|---|---|
-| 119A 一般 | 97.3% | 95.1% |
-| 119B 必修 | 92.0% | 93.5% |
-| 119C 一般 | 92.0% | 98.3% |
-| 119D 一般 | 92.0% | 95.3% |
-| 119E 必修 | 92.0% | 90.7% |
-| 119F 一般 | 96.0% | 93.8% |
+ブロック別正答率: 119A 97.3% / 119B 92.0% / 119C 92.0% / 119D 92.0% / 119E 92.0% / 119F 96.0%
 
 **観察**:
-- Kimi K2.6 (default vision): Overall 465/500 (93.00%) — Claude-Sonnet-4 (94.20%) と DeepSeek-R1-0528 (92.20%) の間。**Acc は Claude-Sonnet-4 と同点 (375/400)**
+- Kimi K2.6 Overall 465/500 (93.00%) — Claude-Sonnet-4 (94.20%) と DeepSeek-R1-0528 (92.20%) の間。**Acc は Claude-Sonnet-4 と同点 (375/400)**
 - 必修(91.00%)が一般(94.33%)より3pt 低く、3点重み問題の取りこぼしが Score を下げる主因
-- No-Img required は Kimi/GLM 完全同値 (158/175 / 82/89) — 偶然の同点ではあるが、text-only の難易度はほぼ揃ってる
-- プロンプト形式差: Kimi K2.6 で **default +10 点 (455→465)** 改善 — `<answer>` タグより `answer:` 行の方が遵守率高い
+- GLM-5.1 はハーネス清書前の旧プロンプトでしか測ってないため再ラン待ち
 
 ### JMED-LLM (MCQ 3タスク、`κ(accuracy)` 形式) — Avg κ で並び替え
 
@@ -132,29 +114,26 @@ JMED-LLM 公式 LB に Claude 4系/GPT-5/Gemini 2.5+ の評価は無く、現状
 
 ### IgakuQA (2018-2022、5年合算)
 
-PFN ([HF card](https://huggingface.co/pfnet/Preferred-MedLLM-Qwen-72B) / [arxiv 2504.18080](https://arxiv.org/abs/2504.18080)) の表を借用、本検証 GLM-5.1 を併記。**PFN行は2485点中 (画像問題テキスト評価込み)**、**本検証行は 1864点中 (画像問題スキップ、No-Img only)** で **scope が異なるため 5年合計% は直接比較不可**:
+PFN ([HF card](https://huggingface.co/pfnet/Preferred-MedLLM-Qwen-72B) / [arxiv 2504.18080](https://arxiv.org/abs/2504.18080)) の表を借用。**5年合計2485点満点、画像問題はテキストのみで盲解き** (PFN/Kasai+ と同 scope)。本検証行は再ラン待ち:
 
 | Entry | 5年合計 Score | 2018 | 2019 | 2020 | 2021 | 2022 |
 |---|---:|---:|---:|---:|---:|---:|
-| **GLM-5.1 (本検証、No-Img only)** | **1742/1864 (93.45%)** | **340/362** | **349/375** | **347/365** | **346/383** | **360/379** |
-| Preferred-MedLLM-Qwen-72B (PFN) | 2156/2485 (86.76%) | 434 | 420 | 439 | 430 | 433 |
-| GPT-4o (PFN) | 2152/2485 (86.60%) | 427 | 431 | 433 | 427 | 434 |
-| Qwen2.5-72B (PFN) | 1992/2485 (80.16%) | 412 | 394 | 394 | 393 | 399 |
-| Llama3-Preferred-MedSwallow-70B (PFN) | 1976/2485 (79.52%) | 407 | 390 | 391 | 393 | 395 |
-| GPT-4 (PFN) | 1944/2485 (78.23%) | 382 | 385 | 387 | 398 | 392 |
-| Mistral-Large-Instruct-2407 (PFN) | 1880/2485 (75.65%) | 370 | 371 | 390 | 373 | 376 |
-| Llama-3.1-Swallow-70B-v0.1 (PFN) | 1842/2485 (74.13%) | 379 | 378 | 379 | 351 | 355 |
-| Meta-Llama-3-70B (PFN) | 1673/2485 (67.32%) | 353 | 340 | 348 | 314 | 318 |
-| GPT-3.5 (PFN) | 1366/2485 (54.97%) | 266 | 250 | 266 | 297 | 287 |
-| (歴史値) GPT-4 (Kasai+ 2023) | 1557/1864 (83.53%、No-Img) | - | - | - | - | - |
-| (歴史値) ChatGPT (Kasai+ 2023) | 1093/1864 (58.64%、No-Img) | - | - | - | - | - |
-| (人間) 学生多数決 (Kasai+ 2023) | 1784/1864 (95.71%、No-Img) | - | - | - | - | - |
+| **GLM-5.1 (本検証)** | 再ラン待ち | - | - | - | - | - |
+| **Kimi K2.6 (本検証)** | 未実行 | - | - | - | - | - |
+| Preferred-MedLLM-Qwen-72B | 2156/2485 (86.76%) | 434 | 420 | 439 | 430 | 433 |
+| GPT-4o | 2152/2485 (86.60%) | 427 | 431 | 433 | 427 | 434 |
+| Qwen2.5-72B | 1992/2485 (80.16%) | 412 | 394 | 394 | 393 | 399 |
+| Llama3-Preferred-MedSwallow-70B | 1976/2485 (79.52%) | 407 | 390 | 391 | 393 | 395 |
+| GPT-4 | 1944/2485 (78.23%) | 382 | 385 | 387 | 398 | 392 |
+| Mistral-Large-Instruct-2407 | 1880/2485 (75.65%) | 370 | 371 | 390 | 373 | 376 |
+| Llama-3.1-Swallow-70B-v0.1 | 1842/2485 (74.13%) | 379 | 378 | 379 | 351 | 355 |
+| Meta-Llama-3-70B | 1673/2485 (67.32%) | 353 | 340 | 348 | 314 | 318 |
+| GPT-3.5 | 1366/2485 (54.97%) | 266 | 250 | 266 | 297 | 287 |
+| (人間) 学生多数決 | 1784/1864 (95.71%、No-Img) | - | - | - | - | - |
 
-出典: PFN行 = [pfnet/Preferred-MedLLM-Qwen-72B (HF card)](https://huggingface.co/pfnet/Preferred-MedLLM-Qwen-72B) / [arxiv 2504.18080](https://arxiv.org/abs/2504.18080)。Kasai+ 行 = [arxiv 2303.18027](https://arxiv.org/abs/2303.18027)、[jungokasai/IgakuQA](https://github.com/jungokasai/IgakuQA)
+出典: 比較行 = [pfnet/Preferred-MedLLM-Qwen-72B (HF card)](https://huggingface.co/pfnet/Preferred-MedLLM-Qwen-72B) / [arxiv 2504.18080](https://arxiv.org/abs/2504.18080)。学生行 = [arxiv 2303.18027](https://arxiv.org/abs/2303.18027) / [jungokasai/IgakuQA](https://github.com/jungokasai/IgakuQA) (No-Img scope のため別建て)
 
 **注**:
-- 各年の満点は ~499点 (画像込み) / ~362-383点 (No-Img のみ、年により変動) で年ごとに微妙に違う。本検証は分母を併記
-- 仮に GLM-5.1 が画像問題で 0点なら 1742/2485 (70.1%)、ランダム選択 (20%) で 1868/2485 (75.2%) → PFN表の Llama-3.1-Swallow / Mistral 帯
 - 2018-2022 はネット解説サイトに完全に出回っており、**フロンティア (Claude 4系/GPT-5/Gemini 2.5+) は事前学習リーク確実視** → publicly な評価値も存在しない (2026-05 時点)
 - 最新モデル比較ラインは IgakuQA119 / JMLE2026 に移行
 
@@ -181,9 +160,9 @@ PFN ([HF card](https://huggingface.co/pfnet/Preferred-MedLLM-Qwen-72B) / [arxiv 
 | jemhopqa | 3.3 | 5.1 | | |
 | jsquad | 3.1 | 3.6 | | |
 | mgsm | 3.1 | 5.6 | | |
-| igakuqa | 6.6 | (Phase 4 残り) | | |
-| igakuqa119 | 6.6 | 13.9 | | |
-| jmle2026 | (未測) | 16.2 | | |
+| igakuqa | 再ラン待ち | 未実行 | | |
+| igakuqa119 | 再ラン待ち | 16.3 | | |
+| jmle2026 | 未実行 | 16.2 | | |
 | jmmlu_med | 5.0 | 9.0 | | |
 | crade | 8.7 | 18.1 | | |
 | rrtnm | 7.4 | 15.0 | | |
@@ -195,8 +174,8 @@ PFN ([HF card](https://huggingface.co/pfnet/Preferred-MedLLM-Qwen-72B) / [arxiv 
 | jcommonsenseqa | 99.9 | 78.1 | (Phase 2) | (Phase 3) |
 | jsquad | 111.5 | 78.0 | | |
 | mgsm | 106.6 | 77.8 | | |
-| igakuqa119 | 91.9 | 77.3 | | |
-| jmle2026 | (未測) | 63.9 | | |
+| igakuqa119 | 再ラン待ち | 63.8 | | |
+| jmle2026 | 未実行 | 63.9 | | |
 | crade | 89.1 | 64.0 | | |
 | rrtnm | 101.5 | 63.4 | | |
 
@@ -239,9 +218,9 @@ evals/
 ├── harness/client.py     # streaming + reasoning分離クライアント
 ├── tasks/
 │   ├── llm_jp_eval_subset/
-│   ├── igakuqa/
-│   ├── igakuqa119/       # vision auto-probe 対応
-│   ├── jmle2026/         # vision auto-probe + LB提出形式同梱
+│   ├── igakuqa/          # 画像問題は text-only blind 込み (PFN scope)
+│   ├── igakuqa119/       # vision auto-probe 対応、公式LBプロンプト
+│   ├── jmle2026/         # vision auto-probe 対応、公式LBプロンプト + 提出形式同梱
 │   └── jmed_llm/
 ├── scripts/
 │   ├── fetch_datasets.sh

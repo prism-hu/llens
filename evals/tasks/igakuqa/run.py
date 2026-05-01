@@ -1,12 +1,9 @@
-"""Runner for IgakuQA (jungokasai/IgakuQA) — Japanese medical licensing exam.
+"""Runner for IgakuQA (jungokasai/IgakuQA) — 2018-2022 国試 5年分。
 
-Five years (2018-2022), ~400 problems each. Multi-letter answers (e.g., "ac")
-are scored by exact set match.
-
-Image-bearing problems (text_only=False) are always skipped: the original
-repository ships text content only — no image files are bundled — so vision
-evaluation is impossible here. For image evaluation use IgakuQA119 (which
-bundles images and supports auto vision probe).
+400問/年 × 5 = 2000問、計2485点。Multi-letter answers (e.g., "ac") は
+集合一致で採点。画像問題は **text-only blind** で評価 (元リポが画像本体を
+同梱しておらず、PFN/Kasai+ の公開LBもこの方式)。これにより PFN HF card /
+arxiv 2504.18080 と同 scope (2485-pt) で並ぶ。
 """
 
 from __future__ import annotations
@@ -121,8 +118,6 @@ def run(
     temperature: float,
 ) -> Path:
     problems = load_problems(years)
-    # Always skip image problems — no image files are bundled in the source repo.
-    problems = [p for p in problems if p.get("text_only", True)]
     if limit:
         problems = problems[:limit]
 

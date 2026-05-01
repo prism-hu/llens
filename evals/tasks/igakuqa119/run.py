@@ -1,14 +1,14 @@
-"""Runner for IgakuQA119 (naoto-iwase/IgakuQA119) — 119th medical licensing exam.
+"""Runner for IgakuQA119 (naoto-iwase/IgakuQA119) — 第119回医師国家試験。
 
-400 problems across blocks A-F. Choices come pre-prefixed (e.g. "a. ..."). A
-small number of problems (~4) are numeric calculation problems with empty
-`choices`; we score those by parsed numeric equality.
+400 problems / blocks A-F / 500-pt scale (B/E Q26-50 = 3pt, others = 1pt).
+Prompt format mirrors `naoto-iwase/IgakuQA119` `src/llm_solver.py` (system +
+`answer:`/`confidence:`/`explanation:` 行) so results are directly comparable
+to the public leaderboard.
 
-**Vision auto-detect**: at start of run, sends one test image to the served
-model. If accepted, image-bearing problems (has_image=true) are included with
-multimodal content (vision evaluation). If rejected (text-only model),
-image problems are skipped automatically (No-Img only). `--no-vision` to
-force skip the probe and run text-only.
+Vision auto-probe: at start of run, sends one synthetic red-square PNG and
+asks for the color. If the model truly handles images, image-bearing problems
+(`has_image=true`) are passed multimodally. If not, image problems are skipped
+(No-Img only). `--no-vision` to force-skip the probe.
 """
 
 from __future__ import annotations
@@ -36,23 +36,11 @@ QUESTIONS_DIR = ROOT / "questions"
 IMAGES_DIR = ROOT / "images"
 ANSWERS_CSV = ROOT / "results" / "correct_answers.csv"
 
+ALL_BLOCKS = ["119A", "119B", "119C", "119D", "119E", "119F"]
+REQUIRED_BLOCKS = {"119B", "119E"}
 LETTERS = "abcdefghij"
-EXTRACT_RE = re.compile(r"<answer>(.*?)</answer>", re.DOTALL)
 
-INSTRUCTION_MCQ = (
-    "以下は日本の第119回医師国家試験の問題です。選択肢から正解を選び、"
-    "答えだけを <answer></answer> タグで囲んで返してください。"
-    "複数の選択肢が正解の場合は記号を連結してください(例: <answer>ac</answer>)。"
-)
-INSTRUCTION_NUMERIC = (
-    "以下は日本の第119回医師国家試験の計算問題です。"
-    "解答(数値)だけを <answer></answer> タグで囲んで返してください(例: <answer>42</answer>)。"
-)
-
-# Default モード: naoto-iwase/IgakuQA119 の src/llm_solver.py と同じ
-# system prompt + user prompt + 出力形式を採用。公式 LB と直接比較可能。
-# `--legacy` で旧 `<answer>` タグ形式に切替 (歴史的互換用)。
-OFFICIAL_SYSTEM_PROMPT = """\
+SYSTEM_PROMPT = """\
 あなたは医師国家試験問題を解く優秀で論理的なアシスタントです。
 以下のルールを守って、問題文と選択肢(または数値入力の指示)を確認し、回答してください。
 
@@ -75,7 +63,7 @@ explanation: [選択理由や重要な根拠を簡潔に]
 - 問題に関連しない余計な文は書かず、指定のキー(answer, confidence, explanation)を上記の出力に従って厳密に出力する。
 """
 
-OFFICIAL_ANSWER_RE = re.compile(r"^\s*answer\s*[:：]\s*(.+?)\s*$", re.MULTILINE | re.IGNORECASE)
+ANSWER_PATTERN = re.compile(r"^\s*answer\s*[:：]\s*(.+?)\s*$", re.MULTILINE | re.IGNORECASE)
 
 
 @dataclass
@@ -83,10 +71,10 @@ class SampleResult:
     problem_id: str
     block: str
     is_numeric: bool
-    is_required: bool   # B/E blocks
+    is_required: bool       # B/E blocks
     has_image: bool
-    image_files: list[str]  # filenames passed to the model (vision mode); empty otherwise
-    points_possible: int  # 1 or 3 per official scoring
+    image_files: list[str]  # filenames passed (vision mode); empty otherwise
+    points_possible: int    # 1 or 3 per official scoring
     gold: str
     extracted: str
     extracted_set: list[str]
@@ -118,11 +106,6 @@ def load_problems() -> list[dict[str, Any]]:
 
 
 def find_image_paths(number: str) -> list[Path]:
-    """Locate image files for a problem.
-
-    Convention in naoto-iwase/IgakuQA119: single -> {number}.png,
-    multiple -> {number}-1.png, {number}-2.png, ...
-    """
     single = IMAGES_DIR / f"{number}.png"
     if single.exists():
         return [single]
@@ -138,73 +121,50 @@ def encode_data_url(path: Path) -> str:
 
 
 def build_messages(
-    problem: dict[str, Any], *, vision: bool, official: bool = False
+    problem: dict[str, Any], *, vision: bool
 ) -> tuple[list[dict[str, Any]], list[str]]:
-    """Return (messages, image_filenames). image_filenames is empty unless
-    vision=True and the problem has images.
-
-    official=True: naoto-iwase/IgakuQA119 と同じ system + user 構成 + 出力形式。
-    """
     is_numeric = not problem["choices"]
-
-    if official:
-        if is_numeric:
-            text = f"問題:{problem['question']}\n\n回答を指定された形式で出力してください。"
-        else:
-            choices = "\n".join(problem["choices"])
-            text = (
-                f"問題:{problem['question']}\n\n"
-                f"選択肢:\n{choices}\n\n"
-                f"回答を指定された形式で出力してください。"
-            )
+    if is_numeric:
+        text = f"問題:{problem['question']}\n\n回答を指定された形式で出力してください。"
     else:
-        if is_numeric:
-            text = f"{INSTRUCTION_NUMERIC}\n\n問題: {problem['question']}"
-        else:
-            choices = "\n".join(problem["choices"])
-            text = f"{INSTRUCTION_MCQ}\n\n問題: {problem['question']}\n\n選択肢:\n{choices}"
+        choices = "\n".join(problem["choices"])
+        text = (
+            f"問題:{problem['question']}\n\n"
+            f"選択肢:\n{choices}\n\n"
+            f"回答を指定された形式で出力してください。"
+        )
 
     image_filenames: list[str] = []
+    user_content: Any = text
     if vision and problem.get("has_image", False):
         paths = find_image_paths(problem["number"])
         if paths:
-            user_content: Any = [{"type": "text", "text": text}]
+            items: list[dict[str, Any]] = [{"type": "text", "text": text}]
             for p in paths:
-                user_content.append({
+                items.append({
                     "type": "image_url",
                     "image_url": {"url": encode_data_url(p)},
                 })
                 image_filenames.append(p.name)
-        else:
-            user_content = text
-    else:
-        user_content = text
+            user_content = items
 
-    if official:
-        return [
-            {"role": "system", "content": OFFICIAL_SYSTEM_PROMPT},
-            {"role": "user", "content": user_content},
-        ], image_filenames
-    return [{"role": "user", "content": user_content}], image_filenames
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": user_content},
+    ], image_filenames
 
 
-def extract_match(text: str, *, official: bool = False) -> str:
-    if official:
-        m = OFFICIAL_ANSWER_RE.search(text)
-        if m:
-            return m.group(1).strip().strip('"\'`')
-        # fallback: タグ形式 / 全文
-        m2 = EXTRACT_RE.search(text)
-        return (m2.group(1).strip() if m2 else text).strip()
-    m = EXTRACT_RE.search(text)
-    return (m.group(1).strip() if m else text).strip()
+def parse_answer(text: str) -> str:
+    m = ANSWER_PATTERN.search(text)
+    if m:
+        return m.group(1).strip().strip('"\'`')
+    return text.strip()
 
 
 def score(problem: dict[str, Any], extracted: str) -> tuple[bool, list[str]]:
     is_numeric = not problem["choices"]
     gold = problem["gold"]
     if is_numeric:
-        # Parse the first numeric token from extracted; compare as float.
         m = re.search(r"-?\d+(?:\.\d+)?", extracted)
         if not m:
             return False, []
@@ -212,14 +172,22 @@ def score(problem: dict[str, Any], extracted: str) -> tuple[bool, list[str]]:
             return abs(float(m.group()) - float(gold)) < 1e-6, [m.group()]
         except ValueError:
             return False, []
-    # MCQ: compare letter sets
     pred_letters = sorted({c for c in extracted.lower() if c in LETTERS})
     gold_letters = sorted({c for c in gold.lower() if c in LETTERS})
     return pred_letters == gold_letters, pred_letters
 
 
+def points_for(problem_id: str, block: str) -> int:
+    """必修 (B/E) Q1-25 = 1pt, Q26-50 = 3pt。一般 (A/C/D/F) = 1pt。"""
+    if block not in REQUIRED_BLOCKS:
+        return 1
+    suffix = problem_id[len(block):]
+    digits = "".join(c for c in suffix if c.isdigit())
+    n = int(digits) if digits else 0
+    return 3 if 26 <= n <= 50 else 1
+
+
 def _solid_red_png(size: int = 32) -> bytes:
-    """Hand-craft a tiny solid-red PNG with stdlib only (no Pillow)."""
     def chunk(tag: bytes, data: bytes) -> bytes:
         return (
             struct.pack(">I", len(data))
@@ -228,20 +196,13 @@ def _solid_red_png(size: int = 32) -> bytes:
         )
     sig = b"\x89PNG\r\n\x1a\n"
     ihdr = chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0))
-    row = b"\x00" + (b"\xff\x00\x00" * size)  # filter byte + RGB
+    row = b"\x00" + (b"\xff\x00\x00" * size)
     idat = chunk(b"IDAT", zlib.compress(row * size))
     iend = chunk(b"IEND", b"")
     return sig + ihdr + idat + iend
 
 
 def probe_vision(base_url: str, model: str) -> bool:
-    """Probe whether the served model truly handles images.
-
-    Sends a synthetic solid-red PNG and asks for the color. A genuine
-    multimodal pathway returns "red" / "赤" / similar. Text-only models that
-    silently strip the image return arbitrary text (or refuse), so we check
-    the response content rather than just HTTP success.
-    """
     img_b64 = base64.b64encode(_solid_red_png()).decode("ascii")
     msg = [{
         "role": "user",
@@ -252,11 +213,9 @@ def probe_vision(base_url: str, model: str) -> bool:
         ],
     }]
     try:
-        # reasoning モデルは thinking で max_tokens を消費するので余裕を持たせる
         r = generate(base_url, model, msg, max_tokens=512, timeout=120.0)
     except Exception:
         return False
-    # reasoning_content と content の両方を見て "red"/"赤" 系のキーワードを探す
     full = ((r.reasoning_content or "") + " " + (r.content or "")).lower()
     return "red" in full or "赤" in full or "まっか" in full
 
@@ -272,17 +231,10 @@ def run(
     no_think: bool,
     max_tokens: int,
     temperature: float,
-    legacy: bool = False,
 ) -> Path:
-    # Default = `naoto-iwase/IgakuQA119` 公式形式 (LB直接比較可)。
-    # `--legacy` 指定時のみ独自 `<answer>` タグ形式。
-    official = not legacy
     problems = load_problems()
     problems = [p for p in problems if p["block"] in blocks]
 
-    # Auto-detect vision capability via a synthetic colored-square probe.
-    # Text-only servers either reject or silently ignore the image; we check
-    # the response content (must mention "red"/"赤") to avoid false positives.
     image_problems = [p for p in problems if p.get("has_image", False)]
     if no_vision or not image_problems:
         vision_supported = False
@@ -305,10 +257,9 @@ def run(
     correct_count = 0
     start_dt = datetime.datetime.now().astimezone()
 
-    desc = "igakuqa119_legacy" if legacy else "igakuqa119"
-    pbar = tqdm(problems, desc=desc, unit="q")
+    pbar = tqdm(problems, desc="igakuqa119", unit="q")
     for p in pbar:
-        msgs, image_files = build_messages(p, vision=vision_supported, official=official)
+        msgs, image_files = build_messages(p, vision=vision_supported)
         gen: GenerationResult = generate(
             base_url,
             model,
@@ -317,39 +268,36 @@ def run(
             max_tokens=max_tokens,
             extra_body=extra_body,
         )
-        extracted = extract_match(gen.content, official=official)
+        extracted = parse_answer(gen.content)
         correct, ext_set = score(p, extracted)
         if correct:
             correct_count += 1
-        results.append(
-            SampleResult(
-                problem_id=p["number"],
-                block=p["block"],
-                is_numeric=not p["choices"],
-                is_required=p["block"] in REQUIRED_BLOCKS,
-                has_image=p.get("has_image", False),
-                image_files=image_files,
-                points_possible=points_for(p["number"], p["block"]),
-                gold=p["gold"],
-                extracted=extracted,
-                extracted_set=ext_set,
-                raw=gen.content,
-                correct=correct,
-                ttft_ms=gen.ttft_ms,
-                ttat_ms=gen.ttat_ms,
-                total_time_ms=gen.total_time_ms,
-                reasoning_tokens=gen.reasoning_tokens,
-                answer_tokens=gen.answer_tokens,
-                finish_reason=gen.finish_reason,
-            )
-        )
+        results.append(SampleResult(
+            problem_id=p["number"],
+            block=p["block"],
+            is_numeric=not p["choices"],
+            is_required=p["block"] in REQUIRED_BLOCKS,
+            has_image=p.get("has_image", False),
+            image_files=image_files,
+            points_possible=points_for(p["number"], p["block"]),
+            gold=p["gold"],
+            extracted=extracted,
+            extracted_set=ext_set,
+            raw=gen.content,
+            correct=correct,
+            ttft_ms=gen.ttft_ms,
+            ttat_ms=gen.ttat_ms,
+            total_time_ms=gen.total_time_ms,
+            reasoning_tokens=gen.reasoning_tokens,
+            answer_tokens=gen.answer_tokens,
+            finish_reason=gen.finish_reason,
+        ))
         pbar.set_postfix(acc=f"{correct_count / len(results):.3f}")
 
     end_dt = datetime.datetime.now().astimezone()
-    task_name = "igakuqa119_legacy" if legacy else "igakuqa119"
-    aggregate = aggregate_results(model, no_think, blocks, vision_supported, results, start_dt, end_dt, task_name=task_name)
+    aggregate = aggregate_results(model, no_think, blocks, vision_supported, results, start_dt, end_dt)
     output_dir.mkdir(parents=True, exist_ok=True)
-    out_path = output_dir / f"{task_name}.json"
+    out_path = output_dir / "igakuqa119.json"
     out_path.write_text(json.dumps(aggregate, ensure_ascii=False, indent=2))
     return out_path
 
@@ -372,13 +320,6 @@ def _bucket(samples: list[SampleResult]) -> dict[str, Any]:
 
 
 def compute_leaderboard(samples: list[SampleResult]) -> dict[str, Any]:
-    """Build IgakuQA119 leaderboard-format breakdown.
-
-    Mirrors columns: Overall Score | Overall Acc. | No-Img Score | No-Img Acc.
-    Plus required/general split. Note: if image questions were skipped at run
-    time, "overall" reflects only the questions that were actually scored;
-    use --include-image to populate the full 500-pt overall.
-    """
     no_image = [s for s in samples if not s.has_image]
     return {
         "overall": _bucket(samples),
@@ -408,7 +349,6 @@ def aggregate_results(
     samples: list[SampleResult],
     start_dt: datetime.datetime,
     end_dt: datetime.datetime,
-    task_name: str = "igakuqa119",
 ) -> dict[str, Any]:
     def stat(field: str) -> dict[str, float | None]:
         vals = [getattr(s, field) for s in samples]
@@ -423,10 +363,8 @@ def aggregate_results(
     for s in samples:
         by_block.setdefault(s.block, []).append(s.correct)
 
-    leaderboard = compute_leaderboard(samples)
-
     return {
-        "task": task_name,
+        "task": "igakuqa119",
         "model": model,
         "mode": "think_off" if no_think else "think_on",
         "vision_used": vision_used,
@@ -435,7 +373,7 @@ def aggregate_results(
         "metrics": {
             "accuracy": sum(s.correct for s in samples) / len(samples) if samples else 0.0,
         },
-        "leaderboard": leaderboard,
+        "leaderboard": compute_leaderboard(samples),
         "accuracy_by_block": {
             b: {"n": len(v), "accuracy": sum(v) / len(v)} for b, v in sorted(by_block.items())
         },
@@ -465,24 +403,6 @@ def _count(xs: list[Any]) -> dict[str, int]:
     return out
 
 
-ALL_BLOCKS = ["119A", "119B", "119C", "119D", "119E", "119F"]
-REQUIRED_BLOCKS = {"119B", "119E"}
-
-
-def points_for(problem_id: str, block: str) -> int:
-    """Official IgakuQA119 scoring:
-    必修 (B/E blocks): Q1-25 = 1pt, Q26-50 = 3pt
-    一般 (A/C/D/F):    1pt
-    """
-    if block not in REQUIRED_BLOCKS:
-        return 1
-    # extract numeric suffix from e.g. "119B26"
-    suffix = problem_id[len(block):]
-    digits = "".join(c for c in suffix if c.isdigit())
-    n = int(digits) if digits else 0
-    return 3 if 26 <= n <= 50 else 1
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://localhost:8000")
@@ -490,9 +410,7 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--blocks", nargs="+", default=ALL_BLOCKS, choices=ALL_BLOCKS)
     parser.add_argument("--no-vision", action="store_true",
-                        help="vision capability の auto-probe をスキップし、画像問題を最初から除外する(text-only モデル前提)")
-    parser.add_argument("--legacy", action="store_true",
-                        help="独自 `<answer>` タグ形式で実行 (旧 default、歴史的互換用)。default は naoto-iwase/IgakuQA119 公式 LB 形式。出力は igakuqa119_legacy.json")
+                        help="vision auto-probe をスキップし、画像問題を最初から除外する")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--no-think", action="store_true")
     parser.add_argument("--max-tokens", type=int, default=32768)
@@ -505,14 +423,12 @@ def main() -> int:
         output_dir=args.output_dir,
         blocks=args.blocks,
         no_vision=args.no_vision,
-        legacy=args.legacy,
         limit=args.limit,
         no_think=args.no_think,
         max_tokens=args.max_tokens,
         temperature=args.temperature,
     )
-    label = "igakuqa119_legacy" if args.legacy else "igakuqa119"
-    print(f"[done] {label} -> {out}")
+    print(f"[done] igakuqa119 -> {out}")
     return 0
 
 

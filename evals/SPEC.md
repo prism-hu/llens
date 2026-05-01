@@ -51,26 +51,26 @@ HF 認証は不要(JCQA/JEMHopQA/JSQuAD は GitHub raw、MGSM-ja は HF だが o
 
 [`jungokasai/IgakuQA`](https://github.com/jungokasai/IgakuQA) — 医師国家試験5年分。各問題に `points` フィールドが含まれており(必修問題は3点等)、`points_possible` としてそのまま使用。
 
-**画像問題**: 元リポジトリは問題テキストのみで画像本体は同梱されていない。runner は画像問題を **常時スキップ** (`text_only=False` を除外)。
+**画像問題**: 元リポジトリは問題テキストのみで画像本体は同梱されていない。runner は画像問題も **テキストのみで盲解きさせる** (PFN HF card / Kasai+ 2023 公開LBと同じ scope = 2485点満点)。
 
 回ごとの分母:
 
-| 年 | 回 | Overall (問/点) | No-Img (問/点) |
-|---|---|---|---|
-| 2018 | 第112回 | 400 / 499 | 286 / 362 |
-| 2019 | 第113回 | 400 / 496 | 296 / 375 |
-| 2020 | 第114回 | 400 / 496 | 287 / 365 |
-| 2021 | 第115回 | 400 / 500 | 301 / 383 |
-| 2022 | 第116回 | 400 / 494 | 301 / 379 |
-| **計** | 5年合計 | **2000 / 2485** | **1471 / 1864** |
+| 年 | 回 | 全問 (問/点) |
+|---|---|---|
+| 2018 | 第112回 | 400 / 499 |
+| 2019 | 第113回 | 400 / 496 |
+| 2020 | 第114回 | 400 / 496 |
+| 2021 | 第115回 | 400 / 500 |
+| 2022 | 第116回 | 400 / 494 |
+| **計** | 5年合計 | **2000 / 2485** |
 
-回ごとに必修・一般の数や配点が微妙に違うため Overall は完全な500点ではなく 494〜500 の幅(問題側 `points` をそのまま採用)。`leaderboard` に5年合算、`leaderboard_by_year` に年ごと。
+回ごとに必修・一般の数や配点が微妙に違うため合計は完全な500点ではなく 494〜500 の幅(問題側 `points` をそのまま採用)。`leaderboard` に5年合算、`leaderboard_by_year` に年ごと。出力JSONには `has_image` フラグも残しているので、必要なら `no_image` バケット (1471問/1864点) も `leaderboard.no_image` から取得可能。
 
 ### IgakuQA119 (第119回)
 
 [`naoto-iwase/IgakuQA119`](https://github.com/naoto-iwase/IgakuQA119) — 第119回国試 (2025/2 実施)。OCR済みテキスト + 画像本体(`images/`)同梱。
 
-**プロンプト**: default は `naoto-iwase/IgakuQA119` 公式 `src/llm_solver.py` 形式 (system + `answer:`/`confidence:`/`explanation:` 行) → 公開LB直接比較可。`--legacy` で旧独自形式 (`<answer>` タグ抽出) にフォールバック (出力は `igakuqa119_legacy.json`)。
+**プロンプト**: `naoto-iwase/IgakuQA119` 公式 `src/llm_solver.py` 形式 (system + `answer:`/`confidence:`/`explanation:` 行) → 公開LB直接比較可。
 
 **スコアリング規則**:
 - 必修問題 (B/E ブロック): Q1-25 = 1点、**Q26-50 = 3点**
@@ -207,7 +207,7 @@ SGLang の `--reasoning-parser` で OpenAI互換APIの `reasoning_content` / `co
 |---|---|
 | `tasks.llm_jp_eval_subset` | `--task {jcommonsenseqa,jemhopqa,jsquad,mgsm,all}` |
 | `tasks.igakuqa` | `--years 2018 2019 ...` |
-| `tasks.igakuqa119` | `--blocks 119A 119B ...` `--no-vision`(auto-probe強制スキップ) `--legacy`(旧 `<answer>` タグ形式) |
+| `tasks.igakuqa119` | `--blocks 119A 119B ...` `--no-vision`(auto-probe強制スキップ) |
 | `tasks.jmle2026` | `--blocks A B ...` `--no-vision`(auto-probe強制スキップ) |
 | `tasks.jmed_llm` | `--task {jmmlu_med,crade,rrtnm,smdis,jcsts,all}` (`all` は smdis/jcsts 除外、両者明示時のみ実行可) |
 
@@ -229,7 +229,6 @@ SGLang の `--reasoning-parser` で OpenAI互換APIの `reasoning_content` / `co
 
 引数振り分け:
 - `--no-vision` は `igakuqa119` と `jmle2026` に転送 (両者とも vision タスク)
-- `--legacy` は `igakuqa119` だけに転送 (旧 `<answer>` タグ形式へのフォールバック)
 - それ以外 (`--limit`, `--no-think`, `--max-tokens`, `--temperature`, `--base-url`) は全タスクに転送
 
 実行されるタスク: `llm-jp-eval-subset` の4タスク + `igakuqa` + `igakuqa119` + `jmle2026` + `jmed-llm` の3タスク = **計10タスク**。
