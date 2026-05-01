@@ -37,6 +37,8 @@
 | GPT-OSS-Swallow-120B-RL-v0.1 | 473/500 (94.60%) | 379/400 (94.75%) | 365/382 (95.55%) | 289/302 (95.70%) |
 | gpt-oss-120b (high) | 468/500 (93.60%) | 374/400 (93.50%) | 362/382 (94.76%) | 286/302 (94.70%) |
 
+出典: [naoto-iwase/JMLE2026-Bench](https://github.com/naoto-iwase/JMLE2026-Bench) leaderboard (本検証行除く)
+
 **内訳** (本検証):
 
 | カテゴリ | Kimi K2.6 (vision) | GLM-5.1 | 合否ライン |
@@ -77,6 +79,8 @@
 | DeepSeek-R1 | 448/500 (89.60%) | 356/400 (89.00%) | 350/383 (91.38%) | 270/297 (90.91%) |
 | GPT-4o-mini | 345/500 (69.00%) | 279/400 (69.75%) | 269/383 (70.23%) | 215/297 (72.39%) |
 | (参考) Preferred-MedLLM-Qwen-72B (国産医療FT) | 332/500 (66.40%) | 272/400 (68.00%) | 261/383 (68.15%) | 209/297 (70.37%) |
+
+出典: [naoto-iwase/IgakuQA119](https://github.com/naoto-iwase/IgakuQA119) leaderboard (本検証行除く)
 
 **参考: `--legacy` (旧独自プロンプト `<answer>` タグ抽出) 測定値** — 公式LB との直接比較は不可。プロンプト形式の影響を見るため:
 
@@ -122,6 +126,8 @@
 | gemma-2-9b-it | 0.52(0.64) | 0.33(0.42) | 0.54(0.68) | 0.463 |
 | (参考) Llama-3-ELYZA-JP-8B (国産日本語FT) | 0.34(0.51) | 0.01(0.26) | 0.29(0.52) | 0.213 |
 
+出典: [sociocom/JMED-LLM](https://github.com/sociocom/JMED-LLM) leaderboard (本検証行除く)
+
 JMED-LLM 公式 LB に Claude 4系/GPT-5/Gemini 2.5+ の評価は無く、現状 GPT-4o が最新クラウド baseline。SMDIS/JCSTS は除外(`SPEC.md`)。
 
 ### IgakuQA (2018-2022、5年合算)
@@ -143,6 +149,8 @@ PFN ([HF card](https://huggingface.co/pfnet/Preferred-MedLLM-Qwen-72B) / [arxiv 
 | (歴史値) GPT-4 (Kasai+ 2023) | 1557/1864 (83.53%、No-Img) | - | - | - | - | - |
 | (歴史値) ChatGPT (Kasai+ 2023) | 1093/1864 (58.64%、No-Img) | - | - | - | - | - |
 | (人間) 学生多数決 (Kasai+ 2023) | 1784/1864 (95.71%、No-Img) | - | - | - | - | - |
+
+出典: PFN行 = [pfnet/Preferred-MedLLM-Qwen-72B (HF card)](https://huggingface.co/pfnet/Preferred-MedLLM-Qwen-72B) / [arxiv 2504.18080](https://arxiv.org/abs/2504.18080)。Kasai+ 行 = [arxiv 2303.18027](https://arxiv.org/abs/2303.18027)、[jungokasai/IgakuQA](https://github.com/jungokasai/IgakuQA)
 
 **注**:
 - 各年の満点は ~499点 (画像込み) / ~362-383点 (No-Img のみ、年により変動) で年ごとに微妙に違う。本検証は分母を併記
