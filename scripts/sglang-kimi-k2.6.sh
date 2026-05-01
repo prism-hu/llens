@@ -5,7 +5,7 @@ exec uv run sglang serve \
   --model-path ./models/Kimi-K2.6 \
   --tp 8 \
   --mem-fraction-static 0.9 \
-  --context-length 131072 \
+  --context-length 262144 \
   --chunked-prefill-size 16384 \
   --schedule-conservativeness 1.5 \
   --max-running-requests 16 \
