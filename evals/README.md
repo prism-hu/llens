@@ -12,7 +12,7 @@
 | タスク | Kimi K2.6 | GLM-5.1 |
 |---|---|---|
 | jcommonsenseqa / jemhopqa / jsquad / mgsm | ✓ | ✓ |
-| igakuqa (2018-2022) | ❌ 未実行 | ❌ 再ラン待ち |
+| igakuqa (2018-2022) | ✓ | ❌ 再ラン待ち |
 | igakuqa119 | ✓ | ❌ 再ラン待ち |
 | jmle2026 | ✓ | ❌ 未実行 |
 | jmmlu_med / crade / rrtnm | ✓ | ✓ |
@@ -118,8 +118,8 @@ PFN ([HF card](https://huggingface.co/pfnet/Preferred-MedLLM-Qwen-72B) / [arxiv 
 
 | Entry | 5年合計 Score | 2018 | 2019 | 2020 | 2021 | 2022 |
 |---|---:|---:|---:|---:|---:|---:|
+| **Kimi K2.6 (本検証)** | **2245/2485 (90.34%)** | **441** | **454** | **450** | **449** | **451** |
 | **GLM-5.1 (本検証)** | 再ラン待ち | - | - | - | - | - |
-| **Kimi K2.6 (本検証)** | 未実行 | - | - | - | - | - |
 | Preferred-MedLLM-Qwen-72B | 2156/2485 (86.76%) | 434 | 420 | 439 | 430 | 433 |
 | GPT-4o | 2152/2485 (86.60%) | 427 | 431 | 433 | 427 | 434 |
 | Qwen2.5-72B | 1992/2485 (80.16%) | 412 | 394 | 394 | 393 | 399 |
@@ -134,7 +134,9 @@ PFN ([HF card](https://huggingface.co/pfnet/Preferred-MedLLM-Qwen-72B) / [arxiv 
 出典: 比較行 = [pfnet/Preferred-MedLLM-Qwen-72B (HF card)](https://huggingface.co/pfnet/Preferred-MedLLM-Qwen-72B) / [arxiv 2504.18080](https://arxiv.org/abs/2504.18080)。学生行 = [arxiv 2303.18027](https://arxiv.org/abs/2303.18027) / [jungokasai/IgakuQA](https://github.com/jungokasai/IgakuQA) (No-Img scope のため別建て)
 
 **注**:
-- 2018-2022 はネット解説サイトに完全に出回っており、**フロンティア (Claude 4系/GPT-5/Gemini 2.5+) は事前学習リーク確実視** → publicly な評価値も存在しない (2026-05 時点)
+- Kimi K2.6 は PFN 表トップ (Preferred-MedLLM-Qwen-72B 431.2/年、GPT-4o 430.4/年) を **+18-19点/年で上回る** (449.0/年)
+- 画像問題 (text-only blind) で acc 83.2%、text問題 acc 91.4% → 画像問題は画像見えてないのに7割超解けてる = **リーク疑い濃厚** (2018-2022 はネット解説サイトに完全に出回っている)
+- フロンティア (Claude 4系/GPT-5/Gemini 2.5+) は同様に事前学習リーク確実視で publicly な評価値も存在しない (2026-05 時点)
 - 最新モデル比較ラインは IgakuQA119 / JMLE2026 に移行
 
 ### llm-jp-eval (短縮版)
@@ -160,7 +162,7 @@ PFN ([HF card](https://huggingface.co/pfnet/Preferred-MedLLM-Qwen-72B) / [arxiv 
 | jemhopqa | 3.3 | 5.1 | | |
 | jsquad | 3.1 | 3.6 | | |
 | mgsm | 3.1 | 5.6 | | |
-| igakuqa | 再ラン待ち | 未実行 | | |
+| igakuqa | 再ラン待ち | 13.6 | | |
 | igakuqa119 | 再ラン待ち | 16.3 | | |
 | jmle2026 | 未実行 | 16.2 | | |
 | jmmlu_med | 5.0 | 9.0 | | |
@@ -174,6 +176,7 @@ PFN ([HF card](https://huggingface.co/pfnet/Preferred-MedLLM-Qwen-72B) / [arxiv 
 | jcommonsenseqa | 99.9 | 78.1 | (Phase 2) | (Phase 3) |
 | jsquad | 111.5 | 78.0 | | |
 | mgsm | 106.6 | 77.8 | | |
+| igakuqa | 再ラン待ち | 77.3 | | |
 | igakuqa119 | 再ラン待ち | 63.8 | | |
 | jmle2026 | 未実行 | 63.9 | | |
 | crade | 89.1 | 64.0 | | |
