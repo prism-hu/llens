@@ -224,9 +224,14 @@ def run(
     if limit:
         problems = problems[:limit]
 
-    extra_body: dict[str, Any] = {}
-    if no_think:
-        extra_body["chat_template_kwargs"] = {"enable_thinking": False}
+    # `thinking` (Kimi/V3.2) と `enable_thinking` (GLM) を両方送る。
+    # 関係ないキーは各モデルの template が無視する。
+    extra_body: dict[str, Any] = {
+        "chat_template_kwargs": {
+            "thinking": not no_think,
+            "enable_thinking": not no_think,
+        }
+    }
 
     results: list[SampleResult] = []
     correct_count = 0

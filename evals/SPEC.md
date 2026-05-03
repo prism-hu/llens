@@ -145,14 +145,17 @@ A/D は画像率が高い(A=55%、D=57%が画像)。
 
 ### vision auto-probe(画像問題の自動判定)
 
-`igakuqa119` runner は起動時に **synthetic な red square PNG を送って色を質問**し、応答に `red`/`赤`/`まっか` が含まれるかで multimodal 対応を判定:
+`igakuqa119` / `jmle2026` runner は起動時に **synthetic な red square PNG を送って色を質問**し、応答に `red`/`赤`/`まっか` が含まれるかで multimodal 対応を判定。`reasoning_content` も検査対象に含め、`max_tokens=512` で reasoning モデルに余裕を持たせる。
 
-- **vision OK** → 画像問題を multimodal API (`type: "image_url"` で base64 PNG)で評価、**Overall 列が埋まる**
-- **vision NG** → 画像問題を自動スキップ、**No-Img 列のみ**
+vision NG 時は**全ベンチ blind モード** (画像問題もテキストのみで強制解答)。これで text-only モデルも Overall 列が populated され、公開LB と同 scope で並ぶ:
 
-reasoning モデル考慮で `max_tokens=512` に余裕を持たせ、`reasoning_content` も検査対象に含める。
+| ベンチ | vision NG の挙動 | LB側の根拠 |
+|---|---|---|
+| `igakuqa` (2018-2022) | 常に blind (画像本体非同梱) | PFN/Kasai+ も text-only blind |
+| `igakuqa119` | blind → 全400問 (Overall 列も埋まる) | LB の Preferred-MedLLM-Qwen-72B 等 text-only が Overall 列に並ぶ (332/500 等) → blind が前提 |
+| `jmle2026` | blind → 全400問 (Overall 列も埋まる) | LB の `image_mode=blind` が default、Qwen3.5 系 text-only も All (400) 列に並ぶ |
 
-`--no-vision` で probe 強制スキップ可能。`igakuqa` (2018-2022) は画像本体非同梱のため画像問題は常時スキップ。
+`--no-vision` で auto-probe 強制スキップ → 全ベンチ blind 動作。`jsamples[i].has_image` で画像問題か判別可能、`leaderboard.no_image` バケットで text-only サブセットも記録。
 
 ### 公開LB並列形式
 

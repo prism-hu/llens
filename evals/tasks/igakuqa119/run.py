@@ -6,9 +6,11 @@ Prompt format mirrors `naoto-iwase/IgakuQA119` `src/llm_solver.py` (system +
 to the public leaderboard.
 
 Vision auto-probe: at start of run, sends one synthetic red-square PNG and
-asks for the color. If the model truly handles images, image-bearing problems
-(`has_image=true`) are passed multimodally. If not, image problems are skipped
-(No-Img only). `--no-vision` to force-skip the probe.
+asks for the color.
+- vision OK: image-bearing problems passed multimodally (vision mode)
+- vision NG / --no-vision: image-bearing problems も **テキストのみで盲解き** (LB 流儀)
+  → text-only モデルでも Overall 列が埋まり、公開LB の Preferred-MedLLM-Qwen-72B 等と
+    同 scope で並ぶ。
 """
 
 from __future__ import annotations
@@ -238,20 +240,26 @@ def run(
     image_problems = [p for p in problems if p.get("has_image", False)]
     if no_vision or not image_problems:
         vision_supported = False
-        probe_status = "skipped (no_vision flag)" if no_vision else "skipped (no image problems)"
+        probe_status = "skipped (no_vision flag) → image_mode=blind" if no_vision else "skipped (no image problems)"
     else:
         vision_supported = probe_vision(base_url, model)
-        probe_status = "vision OK" if vision_supported else "vision NG → image問題スキップ"
+        probe_status = "vision OK → image_mode=vision" if vision_supported else "vision NG → image_mode=blind (LB default)"
     print(f"[probe] {probe_status}")
 
-    if not vision_supported:
-        problems = [p for p in problems if not p.get("has_image", False)]
+    # LB convention: vision NG でも画像問題は除外せず blind (テキストのみ) で解かせる。
+    # text-only モデルでも Overall 列が埋まり、公開LB と同 scope。
+    # build_messages() 側で vision=False ならテキストのみ送る挙動。
     if limit:
         problems = problems[:limit]
 
-    extra_body: dict[str, Any] = {}
-    if no_think:
-        extra_body["chat_template_kwargs"] = {"enable_thinking": False}
+    # `thinking` (Kimi/V3.2) と `enable_thinking` (GLM) を両方送る。
+    # 関係ないキーは各モデルの template が無視する。
+    extra_body: dict[str, Any] = {
+        "chat_template_kwargs": {
+            "thinking": not no_think,
+            "enable_thinking": not no_think,
+        }
+    }
 
     results: list[SampleResult] = []
     correct_count = 0
@@ -410,7 +418,7 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--blocks", nargs="+", default=ALL_BLOCKS, choices=ALL_BLOCKS)
     parser.add_argument("--no-vision", action="store_true",
-                        help="vision auto-probe をスキップし、画像問題を最初から除外する")
+                        help="vision auto-probe をスキップ。画像問題は blind (テキストのみ) で全問解答")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--no-think", action="store_true")
     parser.add_argument("--max-tokens", type=int, default=32768)

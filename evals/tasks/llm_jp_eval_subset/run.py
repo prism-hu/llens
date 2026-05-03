@@ -137,9 +137,17 @@ def run_task(
     if limit:
         samples = samples[:limit]
 
-    extra_body: dict[str, Any] = {}
-    if no_think:
-        extra_body["chat_template_kwargs"] = {"enable_thinking": False}
+    # 明示送信が必須:
+    #   - DeepSeek V3.2: `thinking` key、default OFF → True で ON 化
+    #   - Kimi K2.6: `thinking` key、default ON → True で冗長確認
+    #   - GLM-5.1: `enable_thinking` key、default ON → True で冗長確認
+    # 両キーを送れば全モデルで意図通り動く (関係ないキーは template が無視)
+    extra_body: dict[str, Any] = {
+        "chat_template_kwargs": {
+            "thinking": not no_think,
+            "enable_thinking": not no_think,
+        }
+    }
 
     results: list[SampleResult] = []
     metric_totals: dict[str, list[float]] = {m: [] for m in metrics}
