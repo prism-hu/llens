@@ -4,9 +4,9 @@
 Prompt format mirrors upstream `benchmark.py` so results are directly
 comparable to the public leaderboard at github.com/naoto-iwase/JMLE2026-Bench.
 
-Vision auto-probe: same red-square synthetic image probe as igakuqa119.
-Image-bearing problems (`requires_image=true`) are passed as multimodal
-content when the served model accepts images, otherwise skipped.
+Vision auto-probe: red-square synthetic image probe at startup.
+- vision OK: image-bearing problems passed multimodally → `Overall (All 400)` 列が埋まる
+- vision NG / --no-vision: image-bearing problems も **テキストのみで盲解き** (LB の `image_mode=blind` default に準拠) → `Overall` 列も埋まるが Text-only モデルの数値として記録
 """
 
 from __future__ import annotations
@@ -213,14 +213,14 @@ def run(
     image_problems = [p for p in problems if p.get("requires_image", False)]
     if no_vision or not image_problems:
         vision_supported = False
-        probe_status = "skipped (no_vision flag)" if no_vision else "skipped (no image problems)"
+        probe_status = "skipped (no_vision flag) → image_mode=blind" if no_vision else "skipped (no image problems)"
     else:
         vision_supported = probe_vision(base_url, model)
-        probe_status = "vision OK" if vision_supported else "vision NG → image問題スキップ"
+        probe_status = "vision OK → image_mode=vision" if vision_supported else "vision NG → image_mode=blind (LB default)"
     print(f"[probe] {probe_status}")
 
-    if not vision_supported:
-        problems = [p for p in problems if not p.get("requires_image", False)]
+    # LB default = blind: vision 不可でも画像問題は除外せず、テキストのみで強制解答させる。
+    # build_messages() 側で vision=False ならテキストのみ送る挙動になっている。
     if limit:
         problems = problems[:limit]
 
@@ -331,7 +331,7 @@ def build_submission_view(
     the file can be lifted out and PR'd to the JMLE2026-Bench leaderboard with
     a small jq selection. We do not write a separate file — it's stored under
     the `submission` key of our standard output."""
-    image_mode = "vision" if vision_used else "skip"
+    image_mode = "vision" if vision_used else "blind"
     overall = _bucket(samples)
     text_only = _bucket([s for s in samples if not s.has_image])
     required = _bucket([s for s in samples if s.is_required])

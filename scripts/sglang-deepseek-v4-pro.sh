@@ -9,6 +9,9 @@ exec uv run sglang serve \
   --chunked-prefill-size 16384 \
   --schedule-conservativeness 1.5 \
   --max-running-requests 8 \
+  --cuda-graph-max-bs 8 \
+  --reasoning-parser deepseek-v3 \
+  --tool-call-parser deepseekv32 \
   --trust-remote-code \
   --served-model-name deepseek-v4-pro \
   --enable-metrics \
