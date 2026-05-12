@@ -6,7 +6,7 @@ set -euo pipefail
 CONTAINER="${OWUI_CONTAINER:-llens-open-webui}"
 DB_PATH_IN_CONTAINER="/app/backend/data/webui.db"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-OUTDIR="${OWUI_BACKUP_DIR:-${SCRIPT_DIR}/../backups}"
+OUTDIR="${OWUI_BACKUP_DIR:-${SCRIPT_DIR}/../../backups}"
 mkdir -p "${OUTDIR}"
 STAMP=$(date +%Y%m%d_%H%M%S)
 OUT="${OUTDIR}/owui-users-${STAMP}.sql"

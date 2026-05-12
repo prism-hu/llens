@@ -28,14 +28,16 @@
 
 ## リポジトリ構成
 
-- `scripts/vllm-*.sh` — モデルごとの vLLM 起動スクリプト
-- `scripts/sglang-*.sh` — モデルごとの SGLang 起動スクリプト
+- `scripts/llm/sglang-*.sh` — モデルごとの SGLang 起動スクリプト
+- `scripts/owui/{backup,restore,wal-flush}.sh` — Open WebUI 運用
+- `scripts/preflight/{audit,apply,scan}.sh` — 院内搬入前の構成適用 / ClamAV
+- `Makefile` — `make run-{kimi,glm,ds3,ds4,qwen}` / `make preflight-{audit,apply,scan}`
 - `docker-compose.yml` — Open WebUI
 - `docs/migration.md` — 本番移行メモ (systemd、専用ユーザー等)
 - モデル情報 (スペック、VRAM、起動コマンド) は README のモデルセクションに記載
 
 ## 方針
 
-- モデル構成は試行錯誤する。システム基盤 (vLLM + Open WebUI + H200x8) は不変
+- モデル構成は試行錯誤する。システム基盤 (SGLang + Open WebUI + H200x8) は不変
 - デフォルト値をそのまま使う。独自設定を入れない
 - 過度な設計をしない。段階的に進める

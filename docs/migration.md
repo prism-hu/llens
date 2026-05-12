@@ -18,11 +18,11 @@ usermod -aG video,render llens
 `/opt/llens` に配置し `llens:llens` で所有。
 管理者は sudo 経由で操作: `sudo -u llens uv sync` 等。
 
-## systemd ユニット (vLLM)
+## systemd ユニット (SGLang)
 
 ```ini
 [Unit]
-Description=LLens vLLM Inference Server
+Description=LLens SGLang Inference Server
 After=network.target nvidia-persistenced.service
 Requires=nvidia-persistenced.service
 
@@ -31,17 +31,7 @@ Type=exec
 User=llens
 Group=llens
 WorkingDirectory=/opt/llens
-ExecStart=/usr/local/bin/uv run vllm serve ./models/GLM-5-FP8 \
-  --tensor-parallel-size 8 \
-  --gpu-memory-utilization 0.85 \
-  --speculative-config.method mtp \
-  --speculative-config.num_speculative-tokens 1 \
-  --tool-call-parser glm47 \
-  --reasoning-parser glm45 \
-  --enable-auto-tool-choice \
-  --served-model-name glm-5 \
-  --host 0.0.0.0 \
-  --port 8000
+ExecStart=/usr/bin/bash scripts/llm/sglang-deepseek-v3.2.sh
 Restart=on-failure
 RestartSec=10
 Environment=HOME=/opt/llens
@@ -50,7 +40,8 @@ Environment=HOME=/opt/llens
 WantedBy=multi-user.target
 ```
 
-- uv をシステムワイドに配置: `/usr/local/bin/uv`
+- 起動コマンドは `scripts/llm/sglang-*.sh` を直接呼ぶ (モデル切替時は ExecStart を差し替え)
+- uv はスクリプト内で `uv run` を使うので `llens` ユーザーから見えるパスに配置
 - `nvidia-persistenced.service` 依存で GPU 初期化後に起動
 - `Restart=on-failure` でクラッシュ時自動復帰
 
