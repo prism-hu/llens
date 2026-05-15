@@ -101,13 +101,19 @@ cp .env.example .env
 [ ] 10. make preflight-audit       ← 現状把握
 [ ] 11. make preflight-apply       ← ホスト hardening
 [ ] 12. make run-<model> &         ← SGLang 起動
-[ ] 13. docker compose up -d
-[ ] 14. ヘルスチェック (README 参照)
-[ ] 15. make preflight-audit       ← 適用後確認
-[ ] 16. 搬入直前の手動停止 (下記「搬入直前チェックリスト」)
-[ ] 17. make preflight-scan        ← シャットダウン直前のフルスキャン
-[ ] 18. shutdown → 院内搬入
+[ ] 13. docker compose build --pull open-webui   ← OWUI カスタム image をビルド
+[ ] 14. docker compose up -d
+[ ] 15. ヘルスチェック (README 参照)
+[ ] 16. make preflight-audit       ← 適用後確認
+[ ] 17. 搬入直前の手動停止 (下記「搬入直前チェックリスト」)
+[ ] 18. make preflight-scan        ← シャットダウン直前のフルスキャン
+[ ] 19. shutdown → 院内搬入
 ```
+
+> 注: OWUI は上流 image に PDF→画像変換用パッケージを焼き込んだ自前 image
+> (`llens/open-webui:vX.Y.Z`) を使う。Dockerfile は `docker/open-webui/`。
+> バージョン上げ時は Dockerfile の FROM タグと docker-compose.yml の image タグを
+> 同期して `docker compose build --pull open-webui` でリビルド。
 
 ---
 

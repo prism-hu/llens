@@ -1,8 +1,16 @@
 services:
   open-webui:
-    image: ghcr.io/open-webui/open-webui:v0.9.5
+    # 上流 OWUI に PDF→画像変換用パッケージを焼き込んだ自前イメージ。
+    # Dockerfile は docker/open-webui/Dockerfile。バージョン上げ時は
+    # Dockerfile の FROM タグと下の image タグを揃えて
+    #   docker compose build --pull open-webui
+    # でリビルド。
+    image: llens/open-webui:v0.9.5
+    build:
+      context: ./docker/open-webui
     container_name: llens-open-webui
     environment:
+      - WEBUI_NAME=LLENS
       - OPENAI_API_BASE_URL=http://host.docker.internal:8000/v1
       - OPENAI_API_KEY=EMPTY
       # Ollama は使わない。デフォルト true のままだと UFW default deny で
