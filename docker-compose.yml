@@ -15,7 +15,8 @@ services:
     volumes:
       - open-webui-data:/app/backend/data
     ports:
-      - "8080:8080"
+      # Caddy (:80) 経由のみ。直接アクセスは localhost (= SSH トンネル) から
+      - "127.0.0.1:8080:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -27,7 +28,8 @@ services:
     image: quay.io/docling-project/docling-serve:v1.17.0
     container_name: llens-docling
     ports:
-      - "5001:5001"
+      # OWUI からは docker network 内で docling:5001 で届く。host 側は debug 用 localhost のみ
+      - "127.0.0.1:5001:5001"
     restart: unless-stopped
 
   dcgm-exporter:
@@ -37,7 +39,8 @@ services:
     cap_add:
       - SYS_ADMIN
     ports:
-      - "9400:9400"
+      # Prometheus からは docker network 内で dcgm-exporter:9400 で届く。host 側は debug 用のみ
+      - "127.0.0.1:9400:9400"
     deploy:
       resources:
         reservations:
@@ -51,7 +54,8 @@ services:
     container_name: llens-prometheus
     restart: unless-stopped
     ports:
-      - "9090:9090"
+      # Grafana からは docker network 内で prometheus:9090 で届く。host 側は debug 用のみ
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
@@ -64,6 +68,7 @@ services:
     container_name: llens-grafana
     restart: unless-stopped
     ports:
+      # HINES 全体から touch 可。volume が空の時 .env の GRAFANA_ADMIN_PASSWORD が seed される
       - "9000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
@@ -71,7 +76,7 @@ services:
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env (see .env.example)}
       - GF_ANALYTICS_REPORTING_ENABLED=false
       - GF_ANALYTICS_CHECK_FOR_UPDATES=false
       - GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES=false

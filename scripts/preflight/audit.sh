@@ -74,6 +74,13 @@ journalctl -u ssh --since "7 days ago" 2>/dev/null | grep -iE "fail|invalid" | t
     || echo "  (記録なし)"
 
 #------------------------------------------------------------------------------
+# 全 LISTEN ポート (外から触れるサービスの棚卸し)
+#------------------------------------------------------------------------------
+section "全 LISTEN ポート (TCP)"
+ss -tlnp 2>/dev/null | awk 'NR==1 || $4 !~ /^127\.0\.0\.1:/' \
+    || echo "  (ss 失敗)"
+
+#------------------------------------------------------------------------------
 # システム状態スナップショット
 #------------------------------------------------------------------------------
 section "有効な systemd timer"
@@ -93,7 +100,8 @@ ss -tupn state established 2>/dev/null || true
 # A) アプリ構成の現状
 #------------------------------------------------------------------------------
 section "[A1] 時刻同期"
-systemctl is-active systemd-timesyncd 2>/dev/null || echo "  inactive"
+echo -n "  systemd-timesyncd: "
+systemctl is-active systemd-timesyncd 2>/dev/null || true
 if [ -f /etc/systemd/timesyncd.conf ]; then
     grep -E "^[^#]*NTP=" /etc/systemd/timesyncd.conf || echo "  NTP=未設定 (デフォルト ntp.ubuntu.com 等)"
 fi
@@ -102,8 +110,29 @@ section "[A2] kernel / nvidia パッケージの hold 状況"
 apt-mark showhold 2>/dev/null | grep -E "linux-|nvidia-" || echo "  (該当 hold なし)"
 
 section "[A3] nvidia-persistenced"
-echo -n "  enabled: " ; systemctl is-enabled nvidia-persistenced 2>/dev/null || echo "not-installed"
-echo -n "  active:  " ; systemctl is-active  nvidia-persistenced 2>/dev/null || true
+# systemctl is-enabled/is-active は disabled/inactive 等で stdout に状態を出しつつ
+# 非0 で終わるため、$(... || echo X) すると state="disabled\nX" になって行が崩れる。
+# stdout を捕まえて空のときだけ placeholder を入れる。
+state=$(systemctl is-enabled nvidia-persistenced 2>/dev/null); [ -z "$state" ] && state=not-installed
+active=$(systemctl is-active nvidia-persistenced 2>/dev/null); [ -z "$active" ] && active=n/a
+echo "  enabled: $state"
+echo "  active:  $active"
+
+section "[A4] UFW 状態"
+if command -v ufw >/dev/null 2>&1; then
+    ufw status verbose 2>/dev/null || echo "  (ufw status 失敗)"
+else
+    echo "  ufw 未インストール"
+fi
+
+section "[A5] SSH ハードニング drop-in"
+SSHD_CONF=/etc/ssh/sshd_config.d/99-llens.conf
+if [ -f "$SSHD_CONF" ]; then
+    echo "[$SSHD_CONF]"
+    cat "$SSHD_CONF"
+else
+    echo "  $SSHD_CONF なし — preflight-apply 未実行?"
+fi
 
 #------------------------------------------------------------------------------
 # B) 余計な設定の現状
@@ -137,15 +166,28 @@ else
     echo "  /etc/default/motd-news なし"
 fi
 
-section "[B5] ClamAV freshclam"
-state=$(systemctl is-enabled clamav-freshclam 2>/dev/null || true)
-echo "  clamav-freshclam: ${state:-not-installed}"
-
-section "[B6] Ubuntu Pro / ESM 関連"
-for unit in ua-timer.timer esm-cache.service apt-news.service; do
-    state=$(systemctl is-enabled "$unit" 2>/dev/null || true)
-    echo "  $unit: ${state:-not-installed}"
-done
+section "[B5] 不要・自動更新サービスの状態"
+while read -r unit description; do
+    [ -z "$unit" ] && continue
+    state=$(systemctl is-enabled "$unit" 2>/dev/null)
+    [ -z "$state" ] && state=not-installed
+    printf "  %-32s %-12s  %s\n" "$unit" "$state" "$description"
+done <<'EOF'
+clamav-freshclam.service        ClamAV 自動パターン更新
+ua-timer.timer                  Ubuntu Pro / ESM 定期チェック
+esm-cache.service               Ubuntu Pro / ESM キャッシュ
+apt-news.service                APT ニュース
+rpcbind.service                 RPC ポートマッパー
+rpcbind.socket                  RPC ポートマッパー
+slurmctld.service               Slurm (HGX vendor pre-install)
+slurmd.service                  Slurm (HGX vendor pre-install)
+cups.service                    CUPS プリンタサーバ
+cups-browsed.service            CUPS ブラウザ
+postfix.service                 Postfix MTA
+nfs-server.service              NFS サーバ
+nfs-kernel-server.service       NFS サーバ (旧名)
+rpc-statd.service               NFS lock daemon
+EOF
 
 echo ""
 echo "=============================================================="

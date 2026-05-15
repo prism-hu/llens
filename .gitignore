@@ -13,3 +13,4 @@ wheels/
 /models
 /backups
 /logs
+.env
