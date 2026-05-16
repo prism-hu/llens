@@ -14,52 +14,38 @@ OpenWebUIのCode Interpreter（Pyodide）でPythonを実行できます。
 - HTTP（同一オリジン用）: pyodide.http
 - および標準ライブラリ
 
-### 追加導入可能なライブラリ（院内ホストから配信）
-以下は `/static/pyodide-extra/` から `micropip` 経由で導入できます。**使用前に必ず該当のセットアップセルを実行**してください。
+### 追加導入可能なパッケージ（院内ホストから配信）
+パッケージ名で指定するだけで `/static/pyodide-extra/` 配下に同梱された wheel が
+導入される。**wheel ファイル名を自分で書く必要は無い**（裏で `index.json` が解決する）。
 
-| 用途 | パッケージ |
-|---|---|
-| Excel(.xlsx) 読み書き | `openpyxl` |
-| Excel(.xlsx) 高速書き出し・グラフ | `xlsxwriter` |
-| Word(.docx) 読み書き | `python-docx` |
-| PowerPoint(.pptx) 読み書き | `python-pptx` |
-| PDF生成 | `fpdf2` |
-| DICOM読み取り | `pydicom` |
-| 文字コード自動判定 | `chardet` |
+| 用途 | パッケージ名 | 一緒に入れる依存 |
+|---|---|---|
+| Excel(.xlsx) 読み書き | `openpyxl` | `et-xmlfile` |
+| Excel(.xlsx) 高速書き出し・グラフ | `xlsxwriter` | — |
+| Word(.docx) 読み書き | `python-docx` | — |
+| PowerPoint(.pptx) 読み書き | `python-pptx` | — |
+| PDF生成 | `fpdf2` | `defusedxml` |
+| DICOM読み取り | `pydicom` | — |
+| 文字コード自動判定 | `chardet` | — |
 
-#### セットアップセル例（必要な行だけ実行）
+micropip は依存自動解決しない (閉域のため `deps=False`)。依存は上表の通り手動で並べて指定する。
+
+#### 導入パターン (必要パッケージをタプルに並べる)
 
 ```python
 import micropip
-_BASE = "/static/pyodide-extra"
+from pyodide.http import pyfetch
 
-# Excel 読み書き
-await micropip.install([
-    f"{_BASE}/et_xmlfile-2.0.0-py3-none-any.whl",
-    f"{_BASE}/openpyxl-3.1.5-py2.py3-none-any.whl",
-], deps=False)
-
-# Excel 高速書き出し
-await micropip.install(f"{_BASE}/xlsxwriter-3.2.9-py3-none-any.whl", deps=False)
-
-# Word 読み書き
-await micropip.install(f"{_BASE}/python_docx-1.2.0-py3-none-any.whl", deps=False)
-
-# PowerPoint
-await micropip.install(f"{_BASE}/python_pptx-1.0.2-py3-none-any.whl", deps=False)
-
-# PDF生成
-await micropip.install([
-    f"{_BASE}/defusedxml-0.7.1-py2.py3-none-any.whl",
-    f"{_BASE}/fpdf2-2.8.7-py3-none-any.whl",
-], deps=False)
-
-# DICOM読み取り
-await micropip.install(f"{_BASE}/pydicom-3.0.2-py3-none-any.whl", deps=False)
-
-# 文字コード判定
-await micropip.install(f"{_BASE}/chardet-7.4.3-py3-none-any.whl", deps=False)
+_idx = (await (await pyfetch("/static/pyodide-extra/index.json")).json())
+await micropip.install(
+    [f"/static/pyodide-extra/{_idx[n]}" for n in ("openpyxl", "et-xmlfile")],
+    deps=False,
+)
 ```
+
+別パッケージを使うときは tuple の中身だけ書き換える。例:
+- PDF 生成: `("fpdf2", "defusedxml")`
+- DICOM 読み取り: `("pydicom",)`
 
 ### 使用不可
 - 重量級ML: torch, tensorflow, transformers, sentence-transformers, spacy

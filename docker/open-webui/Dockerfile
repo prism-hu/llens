@@ -53,6 +53,16 @@ RUN mkdir -p /app/build/static/pyodide-extra \
         pydicom==3.0.2 \
         chardet==7.4.3
 
+# index.json を自動生成: {PEP 503 正規化名: wheel filename}。
+# model にはパッケージ名だけ書かせれば、ブラウザ側で index を引いて
+# 正確な wheel filename に解決できる (filename hallucination 防止)。
+RUN python -c "import json, pathlib, re; \
+d = pathlib.Path('/app/build/static/pyodide-extra'); \
+idx = {re.sub(r'[-_.]+', '-', w.name.split('-')[0]).lower(): w.name \
+       for w in sorted(d.glob('*.whl'))}; \
+(d / 'index.json').write_text(json.dumps(idx, indent=2, sort_keys=True) + '\n'); \
+print('index.json:', json.dumps(idx, indent=2, sort_keys=True))"
+
 # ─────────────────────────────────────────────
 # OWUI ハードコード prompt の差し替え
 # ─────────────────────────────────────────────
