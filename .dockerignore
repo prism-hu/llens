@@ -1,0 +1,36 @@
+# Docker build context exclusion
+# build context = repo root のため、不要な重量級ディレクトリを除外して
+# context 転送を軽量化する。
+
+# 大容量データ (gitignore 済)
+models/
+backups/
+logs/
+
+# 開発・実行成果物
+.venv/
+__pycache__/
+*.py[oc]
+*.egg-info/
+build/
+dist/
+wheels/
+
+# VCS
+.git/
+.gitignore
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# 環境ファイル (.env は機密扱い、image に焼かない)
+.env
+.env.local
+
+# 評価関連 (image に不要)
+evals/
+monitoring/grafana/
+docs/

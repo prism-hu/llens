@@ -7,7 +7,10 @@ services:
     # でリビルド。
     image: llens/open-webui:v0.9.5
     build:
-      context: ./docker/open-webui
+      # build context は repo root。Dockerfile から prompts/code-interpreter.md を
+      # COPY する必要があるため。.dockerignore で重量級ディレクトリは除外済。
+      context: .
+      dockerfile: docker/open-webui/Dockerfile
     container_name: llens-open-webui
     environment:
       - WEBUI_NAME=LLENS

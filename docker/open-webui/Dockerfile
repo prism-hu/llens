@@ -52,3 +52,16 @@ RUN mkdir -p /app/build/static/pyodide-extra \
         defusedxml==0.7.1 \
         pydicom==3.0.2 \
         chardet==7.4.3
+
+# ─────────────────────────────────────────────
+# OWUI ハードコード prompt の差し替え
+# ─────────────────────────────────────────────
+# CODE_INTERPRETER_PYODIDE_PROMPT は env で上書きできない文字列定数で
+# "Do not install packages ... micropip.install() are not available" を含む。
+# LLENS は /static/pyodide-extra/ 経由の micropip を許可する設計のため、
+# prompts/code-interpreter.md (= 単一情報源) の中身で定数ブロックを置換する。
+# build context が repo root のため、COPY パスは repo 相対で指定。
+COPY docker/open-webui/patch-pyodide-prompt.py /tmp/patch-pyodide-prompt.py
+COPY prompts/code-interpreter.md /tmp/code-interpreter.md
+RUN python /tmp/patch-pyodide-prompt.py \
+ && rm /tmp/patch-pyodide-prompt.py /tmp/code-interpreter.md
