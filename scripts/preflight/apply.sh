@@ -106,6 +106,7 @@ else
     ufw allow 80/tcp                                comment 'Caddy -> OWUI'    >/dev/null
     ufw allow 9000/tcp                              comment 'Grafana'          >/dev/null
     ufw allow from 172.16.0.0/12 to any port 8000   comment 'Docker -> SGLang' >/dev/null
+    ufw allow from 172.16.0.0/12 to any port 3000   comment 'Docker -> cage'   >/dev/null
     ufw allow from 100.64.0.0/10 to any port 8000   comment 'Tailnet -> SGLang' >/dev/null
     ufw --force enable >/dev/null
     echo "現在の UFW ルール:"
