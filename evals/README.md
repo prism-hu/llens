@@ -251,7 +251,7 @@ PFN ([HF card](https://huggingface.co/pfnet/Preferred-MedLLM-Qwen-72B) / [arxiv 
 | V3.2 ON | 59.2 | 69.4 | 71.6 | 63.8 | 59.1 | 56.1 | 65.6 | 74.5 |
 | V3.2 OFF | 55.5 | 89.7 | 76.8 | 91.9 | 50.1 | 38.6 | 99.8 | 101.8 |
 
-GLM-5.1 は EAGLE spec decoding 有効、Kimi K2.6 は EAGLE3 ドラフト未公開のため spec decoding 無し。EAGLE3 公開後に Kimi の速度のみ再ラン予定。
+GLM-5.1 は EAGLE spec decoding 有効、Kimi K2.6 は**計測時点では** EAGLE3 ドラフト未公開のため spec decoding 無し。2026-05 に `lightseekorg/kimi-k2.6-eagle3` が公開され `scripts/llm/sglang-kimi-k2.6.sh` で有効化済み — 速度のみ再ラン予定(精度は spec decoding 非依存)。
 
 ## 簡易使い方
 

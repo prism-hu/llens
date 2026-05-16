@@ -23,7 +23,8 @@ RUN apt-get update \
 # ─────────────────────────────────────────────
 RUN pip install --no-cache-dir \
         pdf2image==1.17.0 \
-        pypdf==6.7.5
+        pypdf==6.7.5 \
+        tiktoken
 
 # ─────────────────────────────────────────────
 # Pyodide (ブラウザ WASM) 向け wheel を静的配信ディレクトリへ

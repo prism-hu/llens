@@ -10,6 +10,11 @@ exec uv run sglang serve \
   --schedule-conservativeness 1.5 \
   --max-running-requests 16 \
   --trust-remote-code \
+  --speculative-algorithm EAGLE3 \
+  --speculative-draft-model-path ./models/Kimi-K2.6-eagle3 \
+  --speculative-num-steps 3 \
+  --speculative-eagle-topk 1 \
+  --speculative-num-draft-tokens 4 \
   --reasoning-parser kimi_k2 \
   --tool-call-parser kimi_k2 \
   --served-model-name kimi-k2.6 \

@@ -9,7 +9,7 @@
 
 - 各モデル公式推奨設定 + 公開済み高速化(EAGLE 等)を入れた状態で比較
 - 起動 config は `scripts/sglang-*.sh` で git 管理して透明化
-- 設定差は明示する(例: Kimi K2.6 は公式 EAGLE3 ドラフト未公開のため spec decoding なし)
+- 設定差は明示する(例: Kimi K2.6 の Phase 4 計測時点では EAGLE3 ドラフト未公開のため spec decoding なし。2026-05 に `lightseekorg/kimi-k2.6-eagle3` が公開され、現在は有効化済み)
 - temperature=0、max_tokens=32768、N=1。MoE は微揺れあるが 5%以上の差なら結論可
 - chat template / prompt format は各モデル公式に従う
 

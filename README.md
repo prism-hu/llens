@@ -127,13 +127,16 @@ make run-ds3
 # ダウンロード (~594GB、数時間かかるため深夜バッチ推奨)
 uv run hf download moonshotai/Kimi-K2.6 --local-dir ./models/Kimi-K2.6
 
+# EAGLE3 draft (~6GB、speculative decoding 用、2026-05 公開)
+uv run hf download lightseekorg/kimi-k2.6-eagle3 --local-dir ./models/Kimi-K2.6-eagle3
+
 # 起動 (SGLang)
 make run-kimi
 ```
 
 > INT4 QAT ネイティブ量子化のため BF16 比の品質劣化はほぼ無し。H200x8 で動作する 1T クラスの現実解。SGLang v0.5.10 以降が必要。
 >
-> `--dp 8 --enable-dp-attention` と `--speculative-*` は K2.6 での検証が不十分なため初回は付けない。最小構成で安定稼働を確認してから段階的に追加検討。
+> EAGLE3 speculative decoding を有効化済み (`scripts/llm/sglang-kimi-k2.6.sh`)。lossless で VRAM コストも 6GB/1128GB と微少、低〜中並列 (`--max-running-requests 16`) では decode 速度が上がる方向にしか動かない。`--dp 8 --enable-dp-attention` は K2.6 での検証が不十分なため未適用。
 >
 > DeepSeek V3.2 との並列運用は VRAM 的に不可 (切替運用)。
 
