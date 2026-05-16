@@ -13,23 +13,19 @@ services:
       - WEBUI_NAME=LLENS
       - OPENAI_API_BASE_URL=http://host.docker.internal:8000/v1
       - OPENAI_API_KEY=EMPTY
-      # Ollama は使わない。デフォルト true のままだと UFW default deny で
-      # host.docker.internal:11434 への問い合わせが TCP タイムアウト (20秒) して
-      # /api/models の応答が遅延するため明示的に無効化する。
       - ENABLE_OLLAMA_API=false
-      # GitHub release への問い合わせ (= 外向き通信) と UI 通知の両方を止める。
-      # WEBUI_SHOW_UPDATE_NOTIFICATION は UI 通知だけを抑制する古い変数で、こちらが master switch。
       - ENABLE_VERSION_UPDATE_CHECK=false
       - ENABLE_PERSISTENT_CONFIG=false
-      - 'DEFAULT_PROMPT_SUGGESTIONS=[{"title":["はじめての方へ","LLENSの使い方"],"content":"はじめて使います。何ができるか教えてください。"}]'
       - ENABLE_FOLLOW_UP_GENERATION=false
       - ENABLE_AUTOCOMPLETE_GENERATION=false
       - CONTENT_EXTRACTION_ENGINE=docling
       - DOCLING_SERVER_URL=http://docling:5001
+      - ENABLE_PIP_INSTALL_FRONTMATTER_REQUIREMENTS=false
+      - 'DEFAULT_PROMPT_SUGGESTIONS=[{"title":["はじめての方へ","LLENSの使い方"],"content":"はじめて使います。何ができるか教えてください。"}]'
     volumes:
       - open-webui-data:/app/backend/data
     ports:
-      # Caddy (:80) 経由のみ。直接アクセスは localhost (= SSH トンネル) から
+      # Caddy (:80) もしくは開発時はCloudflare Tunnelでアクセス
       - "127.0.0.1:8080:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
