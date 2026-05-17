@@ -86,6 +86,18 @@ idx = {re.sub(r'[-_.]+', '-', w.name.split('-')[0]).lower(): w.name \
 print('index.json:', json.dumps(idx, indent=2, sort_keys=True))"
 
 # ─────────────────────────────────────────────
+# 日本語フォント (matplotlib / fpdf2 用)
+# ─────────────────────────────────────────────
+# Pyodide には日本語グリフを持つフォントが無いので、matplotlib の plot や fpdf2 の
+# PDF 出力で日本語が tofu (□) になる。OFL ライセンスの Noto Sans JP Regular TTF を
+# 同一オリジン /static/fonts/ から配信し、prompt の snippet が pyfetch でロードする。
+# fontsource (jsdelivr) の japanese subset, 約 2.3MB。
+RUN mkdir -p /app/build/static/fonts \
+ && curl -fSL \
+        -o /app/build/static/fonts/NotoSansJP-Regular.ttf \
+        https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-jp@latest/japanese-400-normal.ttf
+
+# ─────────────────────────────────────────────
 # OWUI ハードコード prompt の差し替え
 # ─────────────────────────────────────────────
 # CODE_INTERPRETER_PYODIDE_PROMPT は env で上書きできない文字列定数で

@@ -66,6 +66,40 @@ await micropip.install(
 - ローカルファイル直接アクセス（仮想FSのみ。ユーザファイルは `/mnt/uploads/` 経由）
 - 外部ネットワーク通信全般（院内閉域のため）
 
+### 日本語フォント（matplotlib / fpdf2 共通）
+Pyodide には日本語グリフを持つフォントが無く、デフォルトのままだと plot のラベルや
+PDF 出力で日本語が tofu (□) になる。`/static/fonts/NotoSansJP-Regular.ttf` を
+同一オリジンから配信しているので、下記の helper を一度実行して登録する。
+日本語を含む出力をするときは**必ずこの helper を呼んでから**描画 / PDF 生成する。
+
+```python
+import os
+from pyodide.http import pyfetch
+
+JP_FONT_PATH = "/tmp/NotoSansJP-Regular.ttf"
+if not os.path.exists(JP_FONT_PATH):
+    with open(JP_FONT_PATH, "wb") as f:
+        f.write(await (await pyfetch("/static/fonts/NotoSansJP-Regular.ttf")).bytes())
+```
+
+- matplotlib: 上記実行後に以下で font family をグローバル設定する
+  ```python
+  import matplotlib.pyplot as plt
+  from matplotlib import font_manager
+  font_manager.fontManager.addfont(JP_FONT_PATH)
+  plt.rcParams["font.family"] = font_manager.FontProperties(fname=JP_FONT_PATH).get_name()
+  plt.rcParams["axes.unicode_minus"] = False  # マイナス記号の文字化け回避
+  ```
+- fpdf2: `add_font` で登録してから `set_font` で使用
+  ```python
+  from fpdf import FPDF
+  pdf = FPDF()
+  pdf.add_font("NotoSansJP", "", JP_FONT_PATH)
+  pdf.add_page()
+  pdf.set_font("NotoSansJP", size=12)
+  pdf.cell(0, 10, "こんにちは、世界")
+  ```
+
 ### matplotlibでプロットするとき
 必ず以下の形式で出力すること：
 ```python
@@ -83,6 +117,7 @@ plt.close()
 - Markdown記法（![alt](...)）を付けない
 - OpenWebUIが自動的にファイルURLに変換するため、応答本文では変換後のファイルURLをMarkdown形式で参照する
 - 応答本文に生のbase64文字列を貼り付けない
+- 軸ラベル・凡例・タイトルに日本語を含むときは**上記「日本語フォント」の helper を先に実行**
 
 ### 生成したファイルの扱い
 Pyodideで `/mnt/uploads/` 以下にファイルを保存した場合、OpenWebUIの右上スライダーアイコン（設定パネル）→「ファイル」タブに出力ファイルが表示され、ユーザーがダウンロードできる。
