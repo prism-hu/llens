@@ -1,7 +1,7 @@
 """
 title: Token Meter
 author: LLENS
-version: 1.3.1
+version: 1.4.0
 required_open_webui_version: 0.5.0
 description: |
   SGLang から返ってくる本物の usage を使って、会話全体の context 使用率を表示する。
@@ -20,10 +20,18 @@ description: |
   - stream で usage を捕捉、status を都度更新
   - outlet で最後に同じ状態を確定打として再 emit (stream 末端の emit が漏れることがあるため)
 
-  注意: Filter インスタンスは OpenWebUI が会話ごとに分けない可能性あり。
-  複数会話が並行すると累積がズレるので、会話 ID で分けて保持する。
+  重要: OWUI は Filter インスタンスをプロセス全体で共有する (app.state.FUNCTIONS の
+  singleton)。self に request-scoped な状態 (current chat_id, event_emitter) を
+  持たせると並行リクエストで他チャット/他ユーザーの値で上書きされる。
+  すべての handler は __metadata__ と __event_emitter__ を引数で受け取り、self には
+  chat_id でキーされた純粋な累積 state (chat_state dict) のみを置く。
 
 changelog:
+  1.4.0: 並行リクエスト時のセッション間漏洩を修正。Filter は OWUI singleton で共有
+         される (app.state.FUNCTIONS) ため self.current_key / self.event_emitter
+         に request 単位の値を保持すると、別ユーザーの WS に他チャットの数値を
+         emit したり、stream() が違うチャットの state を更新したりしていた。
+         全 handler を __metadata__ / __event_emitter__ 引数受け取りに変更。
   1.3.1: outlet の key 取得バグ修正。outlet の body は response 側で chat_id 構造が
          違い、_chat_key で別キーになって空 state を生成 → 0% で上書きしていた。
          inlet で確定した current_key を使う。state が空なら emit しない。
@@ -33,6 +41,7 @@ changelog:
   1.0.0: 本物の usage
 """
 
+import asyncio
 import logging
 from typing import Any, Awaitable, Callable, Optional
 
@@ -80,14 +89,35 @@ def _build(
     return f"{sig} {pct:.1f}% {bar} | {total_str} | {in_out}"
 
 
-def _chat_key(body: dict, user: Optional[dict]) -> str:
-    """会話を識別するキー。chat_id があればそれ、なければ user+session で代用。"""
-    chat_id = body.get("chat_id")
+def _chat_key(metadata: Optional[dict], user: Optional[dict]) -> Optional[str]:
+    """会話を識別するキー。chat_id があればそれ、無ければ user+session で代用。
+    どちらも無ければ None (state を持てないので no-op)。"""
+    md = metadata or {}
+    chat_id = md.get("chat_id")
     if chat_id:
         return f"chat:{chat_id}"
-    session_id = body.get("session_id") or ""
+    session_id = md.get("session_id") or ""
     user_id = (user or {}).get("id") or ""
-    return f"sess:{user_id}:{session_id}"
+    if session_id or user_id:
+        return f"sess:{user_id}:{session_id}"
+    return None
+
+
+async def _emit(
+    event_emitter: Optional[Callable[[Any], Awaitable[None]]],
+    description: str,
+) -> None:
+    if event_emitter is None:
+        return
+    try:
+        await event_emitter(
+            {
+                "type": "status",
+                "data": {"description": description, "done": True},
+            }
+        )
+    except Exception as e:
+        logger.error(f"[TokenMeter] emit FAIL: {e!r}")
 
 
 class Filter:
@@ -102,26 +132,14 @@ class Filter:
     def __init__(self):
         self.file_handler = False
         self.valves = self.Valves()
-        # 会話ごとの累積 (chat_id → 状態)
-        # state: {"in": int, "out": int, "prev_prompt": int|None, "prev_completion": int|None}
+        # 会話ごとの累積 (chat_id → 状態)。
+        # OWUI singleton なので全 user/全 chat で共有されるが、key が chat_id なので
+        # ここに値を入れる/読む分には他チャットを汚染しない。
+        # state: {"in": int, "out": int, "prev_prompt": int|None, "prev_completion": int|None,
+        #         "emitter": Callable|None}
+        # emitter は stream() (sync) から最新 emit 先を引くために key 単位で保持する。
         self.chat_state: dict[str, dict] = {}
-        # 今アクティブな会話のキー (stream / outlet で参照する)
-        self.current_key: Optional[str] = None
-        self.event_emitter: Optional[Callable[[Any], Awaitable[None]]] = None
-        logger.error("[TokenMeter] __init__ v1.3.1")
-
-    async def _emit(self, description: str):
-        if self.event_emitter is None:
-            return
-        try:
-            await self.event_emitter(
-                {
-                    "type": "status",
-                    "data": {"description": description, "done": True},
-                }
-            )
-        except Exception as e:
-            logger.error(f"[TokenMeter] emit FAIL: {e!r}")
+        logger.error("[TokenMeter] __init__ v1.4.0")
 
     def _get_state(self, key: str) -> dict:
         if key not in self.chat_state:
@@ -130,6 +148,7 @@ class Filter:
                 "out": 0,
                 "prev_prompt": None,
                 "prev_completion": None,
+                "emitter": None,
             }
         return self.chat_state[key]
 
@@ -139,44 +158,54 @@ class Filter:
     async def inlet(
         self,
         body: dict,
-        __event_emitter__: Callable[[Any], Awaitable[None]],
+        __event_emitter__: Optional[Callable[[Any], Awaitable[None]]] = None,
+        __metadata__: Optional[dict] = None,
         __user__: Optional[dict] = None,
     ) -> dict:
-        self.event_emitter = __event_emitter__
-        self.current_key = _chat_key(body, __user__)
-        state = self._get_state(self.current_key)
-
-        # SGLang に usage を返させる
+        # SGLang に usage を返させる (state の有無に関わらず実行)
         stream_options = body.get("stream_options") or {}
         if not isinstance(stream_options, dict):
             stream_options = {}
         stream_options["include_usage"] = True
         body["stream_options"] = stream_options
 
-        # ターン間の差分計算用に prev はリセットしておく
-        # (前ターンの最終 prompt/completion は今ターンの差分計算には使わない)
+        key = _chat_key(__metadata__, __user__)
+        if key is None:
+            return body
+
+        state = self._get_state(key)
+
+        # 次ターンの差分計算用に prev はリセット
         state["prev_prompt"] = None
         state["prev_completion"] = None
 
-        # 累積 in/out は維持。表示は前ターン終了時の値で開始
+        # stream() (sync) から後で参照するため emitter を chat key 単位で保持
+        state["emitter"] = __event_emitter__
+
         description = _build(
             state["in"],
             state["out"],
             self.valves.context_size,
             self.valves.bar_length,
         )
-        await self._emit(description)
+        await _emit(__event_emitter__, description)
         logger.error(
-            f"[TokenMeter] inlet key={self.current_key} "
-            f"in={state['in']} out={state['out']}"
+            f"[TokenMeter] inlet key={key} in={state['in']} out={state['out']}"
         )
         return body
 
     # --------------------------------------------------------
     # stream
     # --------------------------------------------------------
-    def stream(self, event: dict) -> dict:
-        if self.current_key is None:
+    def stream(
+        self,
+        event: dict,
+        __event_emitter__: Optional[Callable[[Any], Awaitable[None]]] = None,
+        __metadata__: Optional[dict] = None,
+        __user__: Optional[dict] = None,
+    ) -> dict:
+        key = _chat_key(__metadata__, __user__)
+        if key is None:
             return event
 
         usage = None
@@ -198,7 +227,7 @@ class Filter:
         if not isinstance(prompt, int) or not isinstance(completion, int):
             return event
 
-        state = self._get_state(self.current_key)
+        state = self._get_state(key)
 
         # in: 最新の prompt_tokens がそのまま「会話の入力累積」
         # ただし最初の prompt にはターン N-1 までの全 out も含まれているので、
@@ -206,7 +235,6 @@ class Filter:
         # state["out"] が前ターンまでの累積、その上で今ターン分を加算していく。
         if state["prev_prompt"] is None:
             # 今ターン最初の usage
-            # in は「prompt - 既存の累積 out」が「会話全体の真のユーザ入力」
             new_in = prompt - state["out"]
             if new_in < state["in"]:
                 # 履歴トリミング等で小さくなる場合は前回値を尊重
@@ -231,18 +259,19 @@ class Filter:
             self.valves.bar_length,
         )
 
-        try:
-            import asyncio
-
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(self._emit(description))
-        except RuntimeError:
-            pass
+        # stream() は sync のため emit は background task に逃がす。
+        # 優先順位: 呼び出し時に渡された emitter > inlet で保存した emitter
+        emitter = __event_emitter__ or state.get("emitter")
+        if emitter is not None:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(_emit(emitter, description))
+            except RuntimeError:
+                pass
 
         logger.error(
-            f"[TokenMeter] key={self.current_key} "
-            f"prompt={prompt} completion={completion} "
+            f"[TokenMeter] key={key} prompt={prompt} completion={completion} "
             f"→ in={state['in']} out={state['out']}"
         )
         return event
@@ -253,18 +282,16 @@ class Filter:
     async def outlet(
         self,
         body: dict,
-        __event_emitter__: Callable[[Any], Awaitable[None]],
+        __event_emitter__: Optional[Callable[[Any], Awaitable[None]]] = None,
+        __metadata__: Optional[dict] = None,
         __user__: Optional[dict] = None,
     ) -> dict:
-        self.event_emitter = __event_emitter__
-
-        # outlet の body は response 側で chat_id を含まないことがあり、
-        # _chat_key で再計算すると別キーになって新規空 state を作って 0% で上書きしてしまう。
-        # inlet で確定した current_key を使う。
-        if self.current_key is None:
+        key = _chat_key(__metadata__, __user__)
+        if key is None:
             return body
-        state = self.chat_state.get(self.current_key)
+        state = self.chat_state.get(key)
         if state is None:
+            # inlet を踏んでいない (state 空) なら確定打は出さない
             return body
 
         description = _build(
@@ -273,5 +300,5 @@ class Filter:
             self.valves.context_size,
             self.valves.bar_length,
         )
-        await self._emit(description)
+        await _emit(__event_emitter__, description)
         return body

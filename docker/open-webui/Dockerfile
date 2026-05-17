@@ -29,14 +29,21 @@ RUN pip install --no-cache-dir \
 # ─────────────────────────────────────────────
 # Pyodide (ブラウザ WASM) 向け wheel を静的配信ディレクトリへ
 # ─────────────────────────────────────────────
-# 取得対象: PyPI に pure Python wheel (py3-none-any) があるもののみ。
-# Pyodide ネイティブ同梱で重複バンドルする必要が無いものは除外:
-#   lxml / Pillow / numpy / pandas / scipy / matplotlib / regex /
-#   beautifulsoup4 / sympy / tiktoken / pytz / Jinja2 / MarkupSafe /
-#   pycryptodome / typing_extensions
-# pure Python wheel が無い (= C 拡張のみ) ものはここでは取得できない:
-#   MarkupSafe, pycryptodome 等。これらは上記の通り Pyodide 側に既存。
-
+# /app/build/static/pyodide-extra/ に置いた wheel は同一オリジン HTTP で配信され、
+# pyfetch + micropip.install(deps=False) でブラウザ Pyodide にロードされる。
+#
+# OWUI 0.9.5 同梱 Pyodide = 0.28.0.dev0 / ABI cp313-pyodide_2025_0_wasm32。
+# `/app/build/pyodide/` に下記の wheel だけが既に bundle されており、
+# `loadPackagesFromImports` で import から auto-load される (再配布不要):
+#   beautifulsoup4 / matplotlib / numpy / pandas / pillow / pytz / regex /
+#   scikit-learn / scipy / sympy / tiktoken / typing_extensions
+#   (openai / requests / pydantic / httpx 等 OWUI 内部用も含む)
+#
+# 注意: pyodide-lock.json には lxml / jinja2 / markupsafe / pycryptodome 等の
+# entry も載っているが OWUI は wheel ファイルを bundle から落としているため、
+# `await micropip.install("lxml")` 等は 404 で失敗する。下記の経路で別途配信する。
+#
+# 経路 A: pure-Python wheel (py3-none-any) を PyPI から取得。
 RUN mkdir -p /app/build/static/pyodide-extra \
  && pip download \
         --dest /app/build/static/pyodide-extra \
@@ -52,7 +59,21 @@ RUN mkdir -p /app/build/static/pyodide-extra \
         fpdf2==2.8.7 \
         defusedxml==0.7.1 \
         pydicom==3.0.2 \
-        chardet==7.4.3
+        chardet==7.4.3 \
+        Jinja2==3.1.6
+
+# 経路 B: C 拡張ありで Pyodide 専用 emscripten ビルドが必要なもの (PyPI には無い)。
+# Pyodide upstream (jsdelivr v0.28.0/full) から ABI 2025_0 wheel を直接取得する。
+# OWUI 同梱 Pyodide (0.28.0.dev0) と v0.28.0 はリビジョン差があるが ABI が同一
+# (cp313-pyodide_2025_0_wasm32) なので import 互換。
+# pyfetch 経由で導入するため pyodide-lock.json の sha256 検証は通らない (関係なし)。
+ARG PYODIDE_CDN=https://cdn.jsdelivr.net/pyodide/v0.28.0/full
+RUN for whl in \
+        lxml-5.4.0-cp313-cp313-pyodide_2025_0_wasm32.whl \
+        markupsafe-3.0.2-cp313-cp313-pyodide_2025_0_wasm32.whl \
+        pycryptodome-3.21.0-cp36-abi3-pyodide_2025_0_wasm32.whl ; do \
+        curl -fSL -o "/app/build/static/pyodide-extra/$whl" "$PYODIDE_CDN/$whl" ; \
+    done
 
 # index.json を自動生成: {PEP 503 正規化名: wheel filename}。
 # model にはパッケージ名だけ書かせれば、ブラウザ側で index を引いて
