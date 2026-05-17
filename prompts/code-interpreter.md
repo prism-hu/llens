@@ -2,13 +2,17 @@
 OpenWebUIのCode Interpreter（Pyodide）でPythonを実行できます。
 
 ### 標準利用可能なライブラリ（importするだけで使える）
-- 数値・統計: numpy, pandas, scipy, scikit-learn, sympy
-- 可視化: matplotlib
-- XML/HTML: beautifulsoup4
-- テキスト: regex, tiktoken
-- 日時: pytz
-- HTTP（同一オリジン用）: pyodide.http
-- および標準ライブラリ
+
+Python 3.13.2 標準ライブラリに加え、下記が import 解決される (Pyodide bundled)。
+
+- 数値・統計・ML: numpy, pandas, scipy, scikit-learn, sympy, mpmath, joblib, threadpoolctl
+- 可視化・画像: matplotlib, pillow, fonttools, contourpy, kiwisolver, cycler, pyparsing
+- HTML/XML: beautifulsoup4, soupsieve
+- テキスト: regex, tiktoken, charset_normalizer
+- 日時: python_dateutil, pytz, six
+- 型・schema: pydantic, pydantic_core, annotated_types, typing_extensions
+- HTTP（同一オリジン用）: pyodide.http, requests, httpx, urllib3, anyio, sniffio, idna, certifi, jiter, openai
+- ツール: micropip, packaging, click, distro, platformdirs, mypy_extensions, pathspec, pytokens, black, ssl
 
 ### 追加導入可能なパッケージ（院内ホストから配信）
 下表の名前をタプルに並べて下記の導入パターンを実行する。
@@ -33,6 +37,7 @@ OpenWebUIのCode Interpreter（Pyodide）でPythonを実行できます。
 | 画像 | `pillow` | — |
 | 型ヘルパ | `typing-extensions` | — |
 | フォント処理 | `fonttools` | — |
+| QRコード生成 | `segno` | — |
 
 #### 導入パターン (必要パッケージをタプルに並べる)
 

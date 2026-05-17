@@ -60,7 +60,8 @@ RUN mkdir -p /app/build/static/pyodide-extra \
         defusedxml==0.7.1 \
         pydicom==3.0.2 \
         chardet==7.4.3 \
-        Jinja2==3.1.6
+        Jinja2==3.1.6 \
+        segno==1.6.6
 
 # 経路 B: C 拡張ありで Pyodide 専用 emscripten ビルドが必要なもの (PyPI には無い)。
 # Pyodide upstream (jsdelivr v0.28.0/full) から ABI 2025_0 wheel を直接取得する。
