@@ -15,31 +15,11 @@ Python 3.13.2 標準ライブラリに加え、下記が import 解決される 
 - ツール: micropip, packaging, click, distro, platformdirs, mypy_extensions, pathspec, pytokens, black, ssl
 
 ### 追加導入可能なパッケージ（院内ホストから配信）
-下表の名前をタプルに並べて下記の導入パターンを実行する。
+用途ごとに必要なパッケージをタプルに並べて下記の導入パターンを実行する。
 **wheel ファイル名は書かなくて良い**（index.json と OWUI 同梱 Pyodide が裏で解決）。
 
-依存欄に出てくる名前 (`lxml`, `pillow`, `typing-extensions`, `fonttools`, `markupsafe` 等) も
-**必ずタプルに並記する**こと。micropip は `deps=False` で依存自動解決しないため、漏れると
-内部 import 時に ModuleNotFoundError になる。
-
-| 用途 | パッケージ名 | 一緒に入れる依存 |
-|---|---|---|
-| Excel(.xlsx) 読み書き | `openpyxl` | `et-xmlfile` |
-| Excel(.xlsx) 高速書き出し・グラフ | `xlsxwriter` | — |
-| Word(.docx) 読み書き | `python-docx` | `lxml`, `typing-extensions` |
-| PowerPoint(.pptx) 読み書き | `python-pptx` | `lxml`, `xlsxwriter`, `pillow`, `typing-extensions` |
-| PDF生成 | `fpdf2` | `defusedxml`, `pillow`, `fonttools` |
-| DICOM読み取り | `pydicom` | — |
-| 文字コード自動判定 | `chardet` | — |
-| XML/HTML 高速処理 | `lxml` | — |
-| テンプレート | `jinja2` | `markupsafe` |
-| 暗号 | `pycryptodome` | — |
-| 画像 | `pillow` | — |
-| 型ヘルパ | `typing-extensions` | — |
-| フォント処理 | `fonttools` | — |
-| QRコード生成 | `segno` | — |
-
-#### 導入パターン (必要パッケージをタプルに並べる)
+micropip は `deps=False` で依存自動解決しないため、タプルに**並記された名前 (依存含む) は
+省略しない**こと。漏れると内部 import 時に ModuleNotFoundError になる。
 
 タプル内の名前は、`/static/pyodide-extra/index.json` にあれば同 wheel を、無ければ
 plain 名のまま micropip に渡す (OWUI 同梱 Pyodide の `pyodide-lock.json` 経由で解決)。
@@ -56,13 +36,22 @@ await micropip.install(
 )
 ```
 
-別パッケージを使うときは tuple の中身だけ書き換える。例:
+用途別タプル（必要なものだけ tuple の中身を書き換えて使う）:
+- Excel(.xlsx) 読み書き: `("openpyxl", "et-xmlfile")`
+- Excel(.xlsx) 高速書き出し・グラフ: `("xlsxwriter",)`
 - Word(.docx) 読み書き: `("python-docx", "lxml", "typing-extensions")`
 - PowerPoint(.pptx) 読み書き: `("python-pptx", "lxml", "xlsxwriter", "pillow", "typing-extensions")`
 - PDF 生成: `("fpdf2", "defusedxml", "pillow", "fonttools")`
 - DICOM 読み取り: `("pydicom",)`
+- 文字コード自動判定: `("chardet",)`
+- XML/HTML 高速処理: `("lxml",)`
 - テンプレート: `("jinja2", "markupsafe")`
-- Excel 読み書き: `("openpyxl", "et-xmlfile")`
+- 暗号: `("pycryptodome",)`
+- 画像: `("pillow",)`
+- 型ヘルパ: `("typing-extensions",)`
+- フォント処理: `("fonttools",)`
+- QRコード生成: `("segno",)`
+- SQL パース・整形・方言変換: `("sqlglot",)`
 
 ### 使用不可
 - 重量級ML: torch, tensorflow, transformers, sentence-transformers, spacy
@@ -73,7 +62,7 @@ await micropip.install(
 
 ### 日本語フォント（matplotlib / fpdf2 共通）
 Pyodide には日本語グリフを持つフォントが無く、デフォルトのままだと plot のラベルや
-PDF 出力で日本語が tofu (□) になる。`/static/fonts/NotoSansJP-Regular.ttf` を
+PDF 出力で日本語が tofu (□) になる。`/static/fonts/NotoSansJP-Regular.otf` を
 同一オリジンから配信しているので、下記の helper を一度実行して登録する。
 日本語を含む出力をするときは**必ずこの helper を呼んでから**描画 / PDF 生成する。
 
@@ -81,10 +70,10 @@ PDF 出力で日本語が tofu (□) になる。`/static/fonts/NotoSansJP-Regul
 import os
 from pyodide.http import pyfetch
 
-JP_FONT_PATH = "/tmp/NotoSansJP-Regular.ttf"
+JP_FONT_PATH = "/tmp/NotoSansJP-Regular.otf"
 if not os.path.exists(JP_FONT_PATH):
     with open(JP_FONT_PATH, "wb") as f:
-        f.write(await (await pyfetch("/static/fonts/NotoSansJP-Regular.ttf")).bytes())
+        f.write(await (await pyfetch("/static/fonts/NotoSansJP-Regular.otf")).bytes())
 ```
 
 - matplotlib: 上記実行後に以下で font family をグローバル設定する
@@ -92,9 +81,10 @@ if not os.path.exists(JP_FONT_PATH):
   import matplotlib.pyplot as plt
   from matplotlib import font_manager
   font_manager.fontManager.addfont(JP_FONT_PATH)
-  plt.rcParams["font.family"] = font_manager.FontProperties(fname=JP_FONT_PATH).get_name()
+  plt.rcParams["font.family"] = "Noto Sans JP"
   plt.rcParams["axes.unicode_minus"] = False  # マイナス記号の文字化け回避
   ```
+
 - fpdf2: `add_font` で登録してから `set_font` で使用
   ```python
   from fpdf import FPDF
@@ -107,6 +97,7 @@ if not os.path.exists(JP_FONT_PATH):
 
 ### matplotlibでプロットするとき
 必ず以下の形式で出力すること：
+
 ```python
 import matplotlib.pyplot as plt
 import io, base64
@@ -118,6 +109,7 @@ buf.seek(0)
 print(f"data:image/png;base64,{base64.b64encode(buf.read()).decode()}")
 plt.close()
 ```
+
 - データURL文字列（data:image/png;base64,...）のみをprintする
 - Markdown記法（![alt](...)）を付けない
 - OpenWebUIが自動的にファイルURLに変換するため、応答本文では変換後のファイルURLをMarkdown形式で参照する

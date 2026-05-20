@@ -1,5 +1,5 @@
 .PHONY: help \
-        run-ds3 run-ds4 run-glm run-kimi run-qwen \
+        run-ds3 run-ds4 run-glm run-kimi run-kimi-noeagle run-qwen \
         preflight-audit preflight-apply preflight-scan
 
 help:
@@ -7,7 +7,8 @@ help:
 	@echo "  make run-ds3           - DeepSeek V3.2   (sglang)"
 	@echo "  make run-ds4           - DeepSeek V4 Pro (sglang)"
 	@echo "  make run-glm           - GLM-5.1         (sglang)"
-	@echo "  make run-kimi          - Kimi K2.6       (sglang)"
+	@echo "  make run-kimi          - Kimi K2.6       (sglang, EAGLE3 spec decoding 有効)"
+	@echo "  make run-kimi-noeagle  - Kimi K2.6       (sglang, spec decoding なし)"
 	@echo "  make run-qwen          - Qwen3.5         (sglang)"
 	@echo ""
 	@echo "搬入前作業 (preflight):"
@@ -29,6 +30,9 @@ run-glm:
 
 run-kimi:
 	bash scripts/llm/sglang-kimi-k2.6.sh
+
+run-kimi-noeagle:
+	bash scripts/llm/sglang-kimi-k2.6.sh --no-eagle
 
 run-qwen:
 	bash scripts/llm/sglang-qwen3.5.sh

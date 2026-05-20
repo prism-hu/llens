@@ -61,7 +61,8 @@ RUN mkdir -p /app/build/static/pyodide-extra \
         pydicom==3.0.2 \
         chardet==7.4.3 \
         Jinja2==3.1.6 \
-        segno==1.6.6
+        segno==1.6.6 \
+        sqlglot==30.8.0
 
 # 経路 B: C 拡張ありで Pyodide 専用 emscripten ビルドが必要なもの (PyPI には無い)。
 # Pyodide upstream (jsdelivr v0.28.0/full) から ABI 2025_0 wheel を直接取得する。
@@ -90,13 +91,15 @@ print('index.json:', json.dumps(idx, indent=2, sort_keys=True))"
 # 日本語フォント (matplotlib / fpdf2 用)
 # ─────────────────────────────────────────────
 # Pyodide には日本語グリフを持つフォントが無いので、matplotlib の plot や fpdf2 の
-# PDF 出力で日本語が tofu (□) になる。OFL ライセンスの Noto Sans JP Regular TTF を
+# PDF 出力で日本語が tofu (□) になる。OFL ライセンスの Noto Sans JP Regular OTF を
 # 同一オリジン /static/fonts/ から配信し、prompt の snippet が pyfetch でロードする。
-# fontsource (jsdelivr) の japanese subset, 約 2.3MB。
+# notofonts/noto-cjk 公式の Japanese subset OTF, 約 4.5MB (family 名が
+# "Noto Sans JP" で正しく入っている版。fontsource の同名 TTF は family 名が
+# "Noto Sans JP Thin" になっており matplotlib の lookup を壊すため不可)。
 RUN mkdir -p /app/build/static/fonts \
  && curl -fSL \
-        -o /app/build/static/fonts/NotoSansJP-Regular.ttf \
-        https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-jp@latest/japanese-400-normal.ttf
+        -o /app/build/static/fonts/NotoSansJP-Regular.otf \
+        https://github.com/notofonts/noto-cjk/raw/main/Sans/SubsetOTF/JP/NotoSansJP-Regular.otf
 
 # ─────────────────────────────────────────────
 # OWUI ハードコード prompt の差し替え
