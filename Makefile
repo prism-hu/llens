@@ -1,6 +1,7 @@
 .PHONY: help \
         run-ds3 run-ds4 run-glm run-kimi run-kimi-noeagle run-qwen \
-        preflight-audit preflight-apply preflight-scan
+        preflight-audit preflight-apply preflight-scan \
+        owui-sync
 
 help:
 	@echo "推論サーバ起動 (前面実行 — Ctrl+C で停止):"
@@ -15,6 +16,9 @@ help:
 	@echo "  make preflight-audit   - 現状確認 (read-only、いつでも何度でも)"
 	@echo "  make preflight-apply   - 不要設定 omit + 構成適用 (idempotent)"
 	@echo "  make preflight-scan    - ClamAV 全体スキャン (シャットダウン直前)"
+	@echo ""
+	@echo "Open WebUI:"
+	@echo "  make owui-sync         - filters/*.py を OWUI に同期 (.env の OWUI_API_KEY 必要)"
 	@echo ""
 	@echo "ログ出力先: logs/"
 
@@ -46,3 +50,7 @@ preflight-apply:
 
 preflight-scan:
 	sudo bash scripts/preflight/scan.sh
+
+# ----- Open WebUI -----
+owui-sync:
+	python3 scripts/owui/sync-functions.py
