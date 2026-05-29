@@ -1,7 +1,7 @@
 """
 title: Token Meter
 author: Ken Enda
-version: 1.7.0
+version: 1.7.1
 required_open_webui_version: 0.5.0
 description: |
   SGLang から返ってくる本物の usage を使って、会話全体の context 使用率を表示する。
@@ -27,9 +27,11 @@ description: |
   chat_id でキーされた純粋な累積 state (chat_state dict) のみを置く。
 
 changelog:
+  1.7.1: default warn_levels を 25% / 50% / 75% の 3 段に変更 (旧: 50% / 80%)。
+         25% で密度意識、50% で簡潔指示、75% で新規長尺タスク抑止 + 別チャット分割提案。
   1.7.0: 単一閾値 warn_threshold_pct を warn_levels: list[WarnLevel(pct, message)] に
          一般化。pct と注入メッセージを 1 ペアで持ち、任意段数の閾値を定義可能。
-         default は 50% / 80% の 2 段で、message はユーザー向け文言ではなく
+         message はユーザー向け文言ではなく
          「モデルに対する行動指示」として書き直し (簡潔応答指示、新規長尺タスク抑止 等)。
          同ターンで複数閾値を跨いだ場合は最高位だけ発火・低位は済み扱い (ノイズ防止)、
          各 pct を下回れば個別リセット → 次回超過で再警告。空配列で機能無効。
@@ -154,19 +156,21 @@ async def _emit(
 
 class WarnLevel(BaseModel):
     pct: float = Field(description="閾値 (%)。この%を初めて超えたターンに message を 1 度注入")
-    message: str = Field(description="注入する system message 本文")
+    message: str = Field(default="", description="注入する system message 本文。空文字なら注入せず通過のみ")
 
 
 _DEFAULT_LEVELS: list[WarnLevel] = [
     WarnLevel(
+        pct=25.0,
+    ),
+    WarnLevel(
         pct=50.0,
         message=(
-            "以降の応答は簡潔さを優先し、長文引用や過去発言の繰り返しを避けること。"
-            "ユーザーが新たに大きな資料を投入してきた場合は、取り込み前に既存 context の要約を提案すること。"
+            "contextにまだ余裕はあるが前提の再掲を避け回答の密度を意識すること。"
         ),
     ),
     WarnLevel(
-        pct=80.0,
+        pct=75.0,
         message=(
             "上限到達が近い。新しい長尺タスクは開始せず、現ターンで保存すべき結論・"
             "状態・コード差分を明示すること。継続作業が必要ならユーザーに別チャットへの分割を促すこと。"
@@ -210,7 +214,7 @@ class Filter:
         # emitter は stream() (sync) から最新 emit 先を引くために key 単位で保持する。
         # warned は超過 system 注入を 1 度だけにするための、発火済 pct 値の集合。
         self.chat_state: dict[str, dict] = {}
-        logger.error("[TokenMeter] __init__ v1.7.0")
+        logger.error("[TokenMeter] __init__ v1.7.1")
 
     def _get_state(self, key: str) -> dict:
         if key not in self.chat_state:
@@ -235,11 +239,12 @@ class Filter:
         # 下回った閾値は warned から除外して、次回超過で再警告できるよう
         state["warned"] = {t for t in state["warned"] if pct >= t}
 
-        # 昇順に並べ、最高位の「超過 & 未警告」を 1 つだけ発火
+        # 昇順に並べ、最高位の「超過 & 未警告 & message あり」を 1 つだけ発火。
+        # message が空の閾値はマーカー扱いで注入対象にしない (高位発火時の包含で warned だけはされる)。
         sorted_levels = sorted(levels, key=lambda lvl: lvl.pct)
         fired: Optional[WarnLevel] = None
         for lvl in reversed(sorted_levels):
-            if pct >= lvl.pct and lvl.pct not in state["warned"]:
+            if pct >= lvl.pct and lvl.pct not in state["warned"] and lvl.message:
                 fired = lvl
                 break
         if fired is None:

@@ -53,4 +53,4 @@ preflight-scan:
 
 # ----- Open WebUI -----
 owui-sync:
-	python3 scripts/owui/sync-functions.py
+	python3 scripts/owui/sync.py
