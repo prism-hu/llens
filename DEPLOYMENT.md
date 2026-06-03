@@ -231,4 +231,4 @@ sudo ufw status verbose | grep 8000
 
 - [README.md](README.md) — モデル/UI の使い方、ヘルスチェック、ユーザー退避
 - [docs/migration.md](docs/migration.md) — 専用ユーザー `llens` への将来移行案 (現在は enda 運用)
-- [docs/evals.md](docs/evals.md) — eval phase の進捗メモ
+- [evals/README.md](evals/README.md) — 院内デプロイ候補モデルの日本語性能評価 (結果サマリ)
