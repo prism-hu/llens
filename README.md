@@ -316,34 +316,6 @@ make run-qwen
 
 > DeepSeek V3.2 より更に軽量。speculative decoding (NEXTN) 対応。
 
-### ベンチマーク比較用(国産モデル)
-
-`evals/` で国内日本語FT組と対比するためのモデル。本番運用候補ではない。
-
-| モデル | HF |
-|---|---|
-| llm-jp-3 8x13B Instruct3 | [llm-jp/llm-jp-3-8x13b-instruct3](https://huggingface.co/llm-jp/llm-jp-3-8x13b-instruct3) |
-| SIP-jmed-llm 3 8x13B (医療特化) | [SIP-med-LLM/SIP-jmed-llm-3-8x13b-OP-32k-R0.1](https://huggingface.co/SIP-med-LLM/SIP-jmed-llm-3-8x13b-OP-32k-R0.1) |
-
-```bash
-uv run hf download llm-jp/llm-jp-3-8x13b-instruct3 --local-dir ./models/llm-jp-3-8x13b-instruct3
-uv run hf download SIP-med-LLM/SIP-jmed-llm-3-8x13b-OP-32k-R0.1 --local-dir ./models/SIP-jmed-llm-3-8x13b-OP-32k-R0.1
-```
-
-起動 (共通スクリプト、デフォルト TP=1 / GPU 0 / port 8000):
-
-```bash
-bash scripts/llm/sglang-llm-jp-3-bench.sh instruct3   # llm-jp-3-8x13b-instruct3
-bash scripts/llm/sglang-llm-jp-3-bench.sh sip-jmed    # SIP-jmed-llm-3-8x13b
-```
-
-> 8x13B MoE は ~47B / FP16 ~94GB なので **1 GPU(141GB) に収まる**。NCCL 通信コスト無しでデコード最速、シングルユーザー eval に最適。
-> TP は `CUDA_VISIBLE_DEVICES` の GPU 数から自動判定。
->
-> 推奨サンプリング (モデルカード): `temperature 0.5`, `top_p 0.8`, `repeat_penalty 1.05`。
-> ただし `evals/` での精度比較は再現性のため `temperature 0` 固定。
-> プロンプト形式は `### 指示: ... ### 応答:` (Alpaca風)、stop は `<EOD|LLM-jp>` (tokenizer 設定で自動認識)。
-
 ## 監視
 
 SGLang 側は `--enable-metrics` 付きで起動する。

@@ -253,6 +253,35 @@ PFN ([HF card](https://huggingface.co/pfnet/Preferred-MedLLM-Qwen-72B) / [arxiv 
 
 GLM-5.1 は EAGLE spec decoding 有効、Kimi K2.6 は**計測時点では** EAGLE3 ドラフト未公開のため spec decoding 無し。2026-05 に `lightseekorg/kimi-k2.6-eagle3` が公開され `scripts/llm/sglang-kimi-k2.6.sh` で有効化済み — 速度のみ再ラン予定(精度は spec decoding 非依存)。
 
+## 比較用モデル(国産)
+
+冒頭のフロンティアOSS勢と対比する国内日本語FT組。本番運用候補ではなく、
+公開リーダーボード上で上位の国産モデルをローカルで同一ハーネスにかけるためのもの。
+
+| モデル | HF |
+|---|---|
+| llm-jp-3 8x13B Instruct3 | [llm-jp/llm-jp-3-8x13b-instruct3](https://huggingface.co/llm-jp/llm-jp-3-8x13b-instruct3) |
+| SIP-jmed-llm 3 8x13B (医療特化) | [SIP-med-LLM/SIP-jmed-llm-3-8x13b-OP-32k-R0.1](https://huggingface.co/SIP-med-LLM/SIP-jmed-llm-3-8x13b-OP-32k-R0.1) |
+
+```bash
+uv run hf download llm-jp/llm-jp-3-8x13b-instruct3 --local-dir ./models/llm-jp-3-8x13b-instruct3
+uv run hf download SIP-med-LLM/SIP-jmed-llm-3-8x13b-OP-32k-R0.1 --local-dir ./models/SIP-jmed-llm-3-8x13b-OP-32k-R0.1
+```
+
+起動 (共通スクリプト、デフォルト TP=1 / GPU 0 / port 8000):
+
+```bash
+bash scripts/llm/sglang-llm-jp-3-bench.sh instruct3   # llm-jp-3-8x13b-instruct3
+bash scripts/llm/sglang-llm-jp-3-bench.sh sip-jmed    # SIP-jmed-llm-3-8x13b
+```
+
+> 8x13B MoE は ~47B / FP16 ~94GB なので **1 GPU(141GB) に収まる**。NCCL 通信コスト無しでデコード最速、シングルユーザー eval に最適。
+> TP は `CUDA_VISIBLE_DEVICES` の GPU 数から自動判定。
+>
+> 推奨サンプリング (モデルカード): `temperature 0.5`, `top_p 0.8`, `repeat_penalty 1.05`。
+> ただし精度比較は再現性のため `temperature 0` 固定。
+> プロンプト形式は `### 指示: ... ### 応答:` (Alpaca風)、stop は `<EOD|LLM-jp>` (tokenizer 設定で自動認識)。
+
 ## 簡易使い方
 
 ```bash
@@ -268,8 +297,8 @@ for t in jcommonsenseqa jemhopqa jsquad mgsm; do
   (cd evals/datasets/llm_jp_eval && uv run python scripts/preprocess_dataset.py -d "$t" -o ./dataset)
 done
 
-# 4. SGLang 起動 (例: GLM-5.1)
-./scripts/sglang-glm5.1.sh   # 別ターミナル
+# 4. SGLang 起動 (例: GLM-5.1) — 別ターミナル
+make run-glm
 
 # 5. スモーク確認 → 本ラン
 ./evals/scripts/run_phase.sh glm-5.1 _smoke --limit 5
