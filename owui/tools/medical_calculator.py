@@ -1,7 +1,7 @@
 """
 title: Medical Calculator
 author: Ken Enda
-version: 0.1
+version: 0.2
 description: 臨床で頻用される、手計算が煩雑かつ誤りやすい医学計算・スコアリングツール。
              使い方の詳細は SKILL 側で取り出すこと。
 requirements:
@@ -1110,6 +1110,44 @@ class Tools:
         }
 
     # =========================================================================
+    # 腫瘍 / 化学療法
+    # =========================================================================
+    def calc_calvert_carboplatin(
+        self,
+        target_auc: float,
+        gfr: float,
+        cap_gfr_at_125: bool = True,
+    ) -> Dict[str, Any]:
+        """Calvert式によるカルボプラチン投与量 (mg) を計算する。
+
+        dose(mg) = target_AUC × (GFR + 25)
+
+        :param target_auc: 目標AUC (mg/mL·min)。単剤で5-7、併用レジメンで2-6が目安。レジメンの規定に従う。
+        :param gfr: 糸球体濾過量 (mL/min、絶対値)。推算する場合は Cockcroft-Gault の CCr を用いることが多い。
+        :param cap_gfr_at_125: 推算GFRを125 mL/minで上限クリップするか。過量投与防止のため推奨 (FDA/NCI)。デフォルトTrue。
+        :return: {dose_mg, gfr_used, gfr_capped, target_auc, formula, note}
+        """
+        gfr_used = gfr
+        capped = False
+        if cap_gfr_at_125 and gfr > 125:
+            gfr_used = 125.0
+            capped = True
+        dose = target_auc * (gfr_used + 25)
+        return {
+            "dose_mg": round(dose),
+            "gfr_used": round(gfr_used, 1),
+            "gfr_capped": capped,
+            "target_auc": target_auc,
+            "formula": "Calvert: dose(mg) = AUC × (GFR + 25)",
+            "note": (
+                "GFRに推算CCr (Cockcroft-Gault等) を用いる場合、過量投与防止のため "
+                "125 mL/min での上限クリップが推奨される (cap_gfr_at_125=True)。"
+                "実測GFR (EDTA/イオヘキソール等) を用いる場合は上限クリップ不要。"
+                "目標AUCはレジメン規定に従い、腎機能・前治療・全身状態で調整すること。"
+            ),
+        }
+
+    # =========================================================================
     # コメントスタブ (Phase 1.5以降で実装候補)
     # =========================================================================
     # 以下、Phase 1のログを見て頻用されるものから順次実装する。
@@ -1118,7 +1156,6 @@ class Tools:
     # def calc_timi_score(type, ...): NSTEMI/STEMI 統合
     # def calc_pesi(simplified=False, ...): PE 重症度
     # def calc_bisap(...): 急性膵炎 簡易版
-    # def calc_calvert_carboplatin(target_auc, gfr): Calvert式 (GFR上限125)
     # def calc_meld_3(...): MELD 3.0 (UNOS 2023〜)
     # def calc_na_correction_rate(...): Na補正速度の上限警告
     #
