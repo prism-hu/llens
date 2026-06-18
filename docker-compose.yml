@@ -27,7 +27,7 @@ services:
       - BYPASS_EMBEDDING_AND_RETRIEVAL=true
       - ENABLE_PIP_INSTALL_FRONTMATTER_REQUIREMENTS=false
       - ENABLE_EVALUATION_ARENA_MODELS=false
-      - ENABLE_API_KEYS=false
+      - ENABLE_API_KEYS=true
       - 'DEFAULT_PROMPT_SUGGESTIONS=[{"title":["はじめての方へ","LLENSの使い方"],"content":"はじめて使います。何ができるか教えてください。"}]'
       # 承認待ちオーバーレイ: 管理者の個人情報は出さず、運営チーム窓口を案内
       - SHOW_ADMIN_DETAILS=false
