@@ -42,8 +42,15 @@ KINDS: dict[str, dict] = {
     "tool": {
         "dir": REPO_ROOT / "owui" / "tools",
         "api_prefix": "/api/v1/tools",
-        # tool は toggle endpoint なし。access は /access/update で別途管理
+        # tool は toggle endpoint なし。
         "post_create_toggles": [],
+        # create 時のみ public read を付与 (OWUI default は private)。
+        # v0.9.5 の public = grant {user:* read} (access_control_to_grants の
+        # "None → public read" がソース)。update では送らず OWUI 側の現状を尊重する
+        # (UI で絞った access を上書きしないため)。
+        "create_access_grants": [
+            {"principal_type": "user", "principal_id": "*", "permission": "read"},
+        ],
     },
 }
 
@@ -135,9 +142,14 @@ def sync_one(
         print(f"[FAIL] 認証失敗 (OWUI_API_KEY を確認)", file=sys.stderr)
         return False
 
-    # 不在 → create
+    # 不在 → create。tool は create 時のみ access_grants を付与 (default public read)。
+    # body 本体には足さない = update 経路では送られず、既存 access を尊重する。
+    create_body = body
+    grants = cfg.get("create_access_grants")
+    if grants:
+        create_body = {**body, "access_grants": grants}
     status, text = http_request(
-        "POST", f"{base}{prefix}/create", api_key, body
+        "POST", f"{base}{prefix}/create", api_key, create_body
     )
     if status != 200:
         print(
@@ -160,6 +172,8 @@ def sync_one(
             )
     if cfg["post_create_toggles"]:
         toggle_msg = "  → active=True, global=True"
+    elif cfg.get("create_access_grants"):
+        toggle_msg = "  → public (user:* read)"
     else:
         toggle_msg = "  ※ access は OWUI 側で要設定"
     print(f"[CREATE {kind}] {fid}  ({name}){toggle_msg}")

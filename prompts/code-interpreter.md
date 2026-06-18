@@ -161,6 +161,37 @@ img = Image.open(io.BytesIO(data))
 `os.listdir('/mnt/uploads')` で見えるのは過去セッションで自分のコードが書いたファイルだけ。
 ユーザアップロード分は必ず上記 pyfetch 経路で取得すること。
 
+### 巨大な生成物の退避 (harvest)
+巨大な中間生成物 (大きい DataFrame / ログ / 長文 / 抽出結果) を作ったとき、全部 print
+すると会話の context を圧迫する。その場合は **中身を出力せず BE に退避し、応答には
+`file_id` だけ出す**。中身の読解・要約は `file_id` を `inspect_artifact` tool に渡して任せる。
+退避は同一オリジンの `POST /api/v1/files/` で行う (cookie 認証は自動付与):
+
+```python
+from pyodide.http import pyfetch
+from pyodide.ffi import to_js
+import js
+
+async def harvest(data: bytes, filename: str, content_type: str = "text/plain") -> str:
+    """bytes を OWUI Files に push し file_id を返す (中身は応答に出さない)。"""
+    u8 = js.Uint8Array.new(len(data)); u8.assign(data)
+    blob = js.Blob.new(to_js([u8]),
+                       to_js({"type": content_type}, dict_converter=js.Object.fromEntries))
+    fd = js.FormData.new(); fd.append("file", blob, filename)
+    resp = await pyfetch("/api/v1/files/", method="POST", body=fd)
+    if resp.status != 200:
+        raise RuntimeError(f"harvest failed: HTTP {resp.status}")
+    return (await resp.json())["id"]
+
+# 例: 巨大な集計結果を退避 (to_string() を print しない)
+fid = await harvest(df.to_csv(index=False).encode("utf-8"), "aggregation.csv", "text/csv")
+print("harvested file_id:", fid)   # 応答に出すのはこの1行だけ
+```
+
+- 退避後は応答本文に `file_id` と「何を退避したか」の 1 行説明だけ書く。中身は貼らない。
+- `/mnt/uploads/` の既存ファイルを退避するときは開いて bytes を渡す:
+  `await harvest(open("/mnt/uploads/out.xlsx", "rb").read(), "out.xlsx", "<mime>")`
+
 ### 院内利用の指針
 - 電子カルテ系CSVは Shift_JIS(CP932) のことが多い。`pd.read_csv(io.BytesIO(data), encoding="cp932")` または `chardet` で判定する。
 - 個人情報を含むファイルを扱う前提のため、ファイル内容を不要に print で羅列しない。集計結果・統計値のみを出力する。
