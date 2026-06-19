@@ -43,6 +43,8 @@ services:
       - ENABLE_CALENDAR=false
       - ENABLE_AUTOMATIONS=false
       - ENABLE_USER_WEBHOOKS=false
+      # subagent tool の会話スレッド置き場 (owui/tools/subagent.py が直接叩く)
+      - REDIS_URL=redis://redis:6379/0
     volumes:
       - open-webui-data:/app/backend/data
     ports:
@@ -52,6 +54,18 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - docling
+      - redis
+    restart: unless-stopped
+
+  redis:
+    # subagent tool (owui/tools/subagent.py) の会話スレッド置き場。会話履歴を
+    # thread_id で保持し、追い質問のたびに復元→積み直し→再推論する。中身も履歴も
+    # ここに隔離され主コンテキストには出ない。scratch なので揮発で良い:
+    # 永続化 OFF + TTL スライディングで放置 thread は自動 GC、再起動で消えて困らない。
+    # OWUI コンテナからのみ触るので host へはポート公開しない。
+    image: redis:7-alpine
+    container_name: llens-redis
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
     restart: unless-stopped
 
   docling:

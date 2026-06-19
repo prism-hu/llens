@@ -74,16 +74,11 @@ def main() -> int:
         )
         return 1
 
-    # md 本文に "\"\"\"" が含まれていたらエスケープ (現状は含まないが念のため)
-    if '"""' in body:
-        print(
-            "[patch-pyodide-prompt] ERROR: source md contains triple-quote, "
-            "would break Python string literal",
-            file=sys.stderr,
-        )
-        return 1
+    # md 本文の """ をエスケープ ("""..."""の中で \"\"\" は値としての """ になる)。
+    # code-interpreter.md の harvest() 例など docstring を含む code block 対策。
+    safe_body = body.replace('"""', r'\"\"\"')
 
-    new_block = f'CODE_INTERPRETER_PYODIDE_PROMPT = """\n{body}\n"""'
+    new_block = f'CODE_INTERPRETER_PYODIDE_PROMPT = """\n{safe_body}\n"""'
     new_text = pattern.sub(lambda _: new_block, text, count=1)
     TARGET.write_text(new_text)
     print(f"[patch-pyodide-prompt] OK — injected {SOURCE} into {TARGET}")

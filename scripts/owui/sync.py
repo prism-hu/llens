@@ -138,9 +138,11 @@ def sync_one(
         )
         return False
 
-    if status == 401:
-        print(f"[FAIL] 認証失敗 (OWUI_API_KEY を確認)", file=sys.stderr)
-        return False
+    # status != 200 は「不在」とみなして create に進む。
+    # 注意: OWUI は存在しない function への GET /functions/id/{id} に 404 でなく 401 を
+    # 返す (functions.py が NOT_FOUND を HTTP_401 で raise。tools は 404)。よって 401 を
+    # 一律「認証失敗」とは扱えない (新規 filter が永遠に create されなくなる)。本物の
+    # bad key なら下の create も 401 を返し、fid 付きで [FAIL ... create status=401] と表出する。
 
     # 不在 → create。tool は create 時のみ access_grants を付与 (default public read)。
     # body 本体には足さない = update 経路では送られず、既存 access を尊重する。

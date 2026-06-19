@@ -1,7 +1,7 @@
 """
 title: Subagent
 author: Ken Enda
-version: 0.2.0
+version: 0.3.0
 required_open_webui_version: 0.5.0
 description: 巨大 / 重い資料を主コンテキストに展開せず、file_id 経由で別 context の
              サブエージェントに読ませて結果だけ返す tool 群。
@@ -9,6 +9,15 @@ description: 巨大 / 重い資料を主コンテキストに展開せず、file
              subagent 側に隔離)。モデルは :8000 に今出ているものを自動使用する。
 
 changelog:
+  0.3.0: 会話継続対応。ask_subagent 1 ツールで新規/継続を兼ねる
+         (file_id で新規、thread_id で継続)。どちらでも thread_id を返すので、続けたければ
+         それを渡し続けるだけ。「one-shot」は続けなかった thread に過ぎず TTL で自動消滅。
+         - 会話履歴を Redis に thread_id で保持し、追い質問のたびに復元→積み直し→再推論。
+           主コンテキストに出るのは thread_id と短い answer だけ (資料も履歴も Redis に隔離)。
+         - Redis = 会話履歴そのもの。資料は初回に history へ一度入るだけ。毎ターン同じ prefix を
+           送るので SGLang prefix cache が効き、再注入コストは prefill 側で吸収される。
+         - 揮発 Redis + TTL スライディング (ターン毎に延長、放置 thread は自動 GC)。
+         - text/image どちらもスレッド化。モデルは初回のものに固定 (途中の切替で文脈が壊れない)。
   0.2.0: ask_subagent を追加 (片道 / one-shot)。file_id + 指示 → 要約を返す本体。
          - content_type で分岐: image/* は生バイトを base64 data URL で image_url 送信、
            それ以外は data.content (docling 抽出) → 無ければ text 系のみ raw decode。
@@ -39,8 +48,10 @@ changelog:
 # =============================================================================
 
 import base64
+import json
 import logging
 import os
+import uuid
 from typing import Any, Awaitable, Callable, Optional
 
 import httpx
@@ -55,6 +66,14 @@ try:
 except Exception:  # ローカル静的解析用フォールバック
     Files = None
     Storage = None
+
+# --- 会話スレッド永続化 (Redis) --------------------------------------------
+try:
+    import redis.asyncio as aioredis
+except Exception:  # ローカル静的解析用フォールバック
+    aioredis = None
+
+_THREAD_KEY = "subagent:thread:"  # Redis key prefix (+ thread_id)
 
 # text として decode してよい content_type (これ以外の binary は decode しない)
 _TEXT_CT_PREFIXES = ("text/",)
@@ -106,9 +125,10 @@ def _read_content(rec) -> tuple[Optional[str], str]:
 
 
 _SUBAGENT_SYSTEM = (
-    "あなたは一回限り呼び出されるサブエージェントです。会話履歴も後続のやり取りもありません。"
-    "与えられた資料に対してユーザーの指示を遂行し、結論と根拠を簡潔に返してください。"
-    "資料に無いことは推測せず『資料からは不明』と述べること。ツールは使えません。"
+    "あなたは特定の資料を任されたサブエージェントです。主エージェントから資料に関する指示が"
+    "届きます (会話が続く場合はこれまでの履歴も保持されています)。最初に渡された資料に基づき、"
+    "各指示に対して結論と根拠を簡潔に返してください。資料に無いことは推測せず『資料からは不明』"
+    "と述べること。ツールは使えません。"
 )
 
 
@@ -140,9 +160,67 @@ class Tools:
         head_chars: int = Field(
             default=800, description="inspect_artifact が返すプレビュー文字数"
         )
+        redis_url: str = Field(
+            default_factory=lambda: os.getenv("REDIS_URL", "redis://redis:6379/0"),
+            description="会話スレッド置き場の Redis。既定は compose の redis サービス。",
+        )
+        thread_ttl_s: int = Field(
+            default=3600,
+            description="会話スレッドの TTL (秒)。ターン毎に延長 (スライディング)。",
+        )
 
     def __init__(self) -> None:
         self.valves = self.Valves()
+        self._redis = None  # aioredis client (遅延生成・再利用)
+
+    # =========================================================================
+    # 共通: 推論コア / 会話スレッド永続化 (Redis)
+    # =========================================================================
+    async def _chat(self, messages: list, model: str = "") -> tuple[str, str]:
+        """messages を :8000 に投げ (answer, 使用model) を返す。model 未指定なら
+        /v1/models の live モデルを自動採用 (単一モデル運用前提)。
+        例外はそのまま上げる (呼び出し側で整形)。"""
+        base = self.valves.model_base_url.rstrip("/")
+        headers = {"Authorization": f"Bearer {self.valves.model_api_key}"}
+        async with httpx.AsyncClient(timeout=self.valves.timeout_s) as client:
+            if not model:
+                mr = await client.get(f"{base}/models", headers=headers)
+                mr.raise_for_status()
+                data = (mr.json() or {}).get("data", [])
+                if not data:
+                    raise RuntimeError(":8000 に live モデルが無い")
+                model = data[0]["id"]
+            resp = await client.post(
+                f"{base}/chat/completions",
+                headers=headers,
+                json={
+                    "model": model,
+                    "messages": messages,
+                    "temperature": self.valves.temperature,
+                    "stream": False,
+                },
+            )
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"], model
+
+    async def _get_redis(self):
+        if aioredis is None:
+            raise RuntimeError("redis.asyncio を解決できない (イメージに redis-py が無い)")
+        if self._redis is None:
+            self._redis = aioredis.from_url(
+                self.valves.redis_url, decode_responses=True
+            )
+        return self._redis
+
+    async def _save_thread(self, tid: str, rec: dict) -> None:
+        """会話履歴を thread_id で保存。ex で TTL をターン毎に張り直す (スライディング)。"""
+        r = await self._get_redis()
+        await r.set(_THREAD_KEY + tid, json.dumps(rec), ex=self.valves.thread_ttl_s)
+
+    async def _load_thread(self, tid: str) -> Optional[dict]:
+        r = await self._get_redis()
+        raw = await r.get(_THREAD_KEY + tid)
+        return json.loads(raw) if raw else None
 
     # =========================================================================
     # 疎通確認: backend が file_id の中身を読めるか
@@ -197,26 +275,89 @@ class Tools:
         }
 
     # =========================================================================
-    # 本体: file_id の資料をサブエージェントに読ませて結果を返す (片道 / one-shot)
+    # 本体: 資料をサブエージェントに読ませて結果を返す。1 ツールで新規/継続を兼ねる。
+    #   - file_id を渡す  → 新規。資料を読ませて答える
+    #   - thread_id を渡す → 継続。前回の資料・会話文脈のまま追い質問
+    # どちらでも thread_id を返すので、続けたければそれを渡し続けるだけ
+    # (「one-shot」は続けなかった thread に過ぎず TTL で勝手に消える)。
+    # 資料の中身も履歴も Redis 側に隔離され、主コンテキストには出ない。
     # =========================================================================
     async def ask_subagent(
         self,
         instruction: str,
-        file_id: str,
+        file_id: str = "",
+        thread_id: str = "",
         __user__: Optional[dict] = None,
         __event_emitter__: Optional[Callable[[Any], Awaitable[None]]] = None,
     ) -> dict:
-        """file_id の資料を別 context のサブエージェントに読ませ、instruction を遂行した
-        結果テキストだけを返す。資料の中身は主コンテキストに展開されない。
+        """資料を別 context のサブエージェントに読ませ、instruction を遂行した結果だけ返す。
+        資料の中身は主コンテキストに展開されない。返り値の thread_id を次回 thread_id に
+        渡せば、同じ資料・同じ会話文脈のまま追い質問できる (履歴は backend の Redis 保持)。
 
-        - テキスト / PDF / Office: 抽出済みテキストを本文として渡す。
-        - 画像 (image/*): 画像そのものを VLM に渡す (:8000 が VLM の時のみ可)。
-        会話履歴は持たない一回限りの呼び出し (片道)。
+        - 新規: file_id を渡す。text/PDF/Office は抽出テキスト、image/* は VLM に画像送信。
+        - 継続: 前回返ってきた thread_id を渡す (file_id 不要、instruction だけ更新)。
+        どちらの呼び方でも thread_id が返る。会話を続けたければそれを渡し続けるだけ。
 
         :param instruction: サブエージェントへの指示 (主モデルが都度組む)
-        :param file_id: 読ませる資料の OWUI file_id (UUID)
-        :return: {ok, answer, model, file_id, filename, mode, truncated?, error?}
+        :param file_id: 新規に読ませる資料の OWUI file_id (UUID)。継続時は省略。
+        :param thread_id: 継続したい会話の thread_id。新規時は省略。
+        :return: {ok, answer, thread_id, model, turns, mode?, filename?, truncated?, error?}
         """
+
+        async def _emit(msg: str, done: bool) -> None:
+            if __event_emitter__:
+                await __event_emitter__(
+                    {"type": "status", "data": {"description": msg, "done": done}}
+                )
+
+        # =====================================================================
+        # 継続: Redis から履歴を復元 → instruction を積んで再推論 → 保存
+        # モデルは初回のものに固定 (途中のモデル切替で文脈が壊れないため)
+        # =====================================================================
+        if thread_id:
+            try:
+                rec = await self._load_thread(thread_id)
+            except Exception as e:
+                return {"ok": False, "error": f"thread 復元失敗 (redis): {e!r}"}
+            if not rec:
+                return {
+                    "ok": False,
+                    "error": (
+                        f"thread_id {thread_id} が無い (TTL 切れ or 誤り)。"
+                        "file_id を渡して開き直すこと。"
+                    ),
+                }
+            messages = rec["messages"]
+            model = rec.get("model", "")
+            messages.append({"role": "user", "content": instruction})
+
+            await _emit(f"subagent 継続: {thread_id}", False)
+            try:
+                answer, model = await self._chat(messages, model=model)
+            except Exception as e:
+                return {"ok": False, "error": f"推論失敗: {e!r}"}
+
+            messages.append({"role": "assistant", "content": answer})
+            try:
+                await self._save_thread(thread_id, {"model": model, "messages": messages})
+            except Exception as e:
+                return {"ok": False, "error": f"thread 保存失敗 (redis): {e!r}"}
+
+            turns = sum(1 for m in messages if m.get("role") == "assistant")
+            await _emit(f"subagent 継続 完了: {thread_id} (turn {turns})", True)
+            return {
+                "ok": True,
+                "answer": answer,
+                "thread_id": thread_id,
+                "model": model,
+                "turns": turns,
+            }
+
+        # =====================================================================
+        # 新規: file_id の資料を読み込み、スレッドを開く
+        # =====================================================================
+        if not file_id:
+            return {"ok": False, "error": "file_id か thread_id のどちらかが必須"}
         if Files is None:
             return {"ok": False, "error": "open_webui 内部 API を解決できない"}
 
@@ -227,12 +368,6 @@ class Tools:
         meta = getattr(rec, "meta", None) or {}
         ct = (meta.get("content_type") or "").lower()
         filename = getattr(rec, "filename", None)
-
-        async def _emit(msg: str, done: bool) -> None:
-            if __event_emitter__:
-                await __event_emitter__(
-                    {"type": "status", "data": {"description": msg, "done": done}}
-                )
 
         # --- メッセージ構築 (text / vision) ---
         truncated = False
@@ -278,34 +413,9 @@ class Tools:
             {"role": "user", "content": user_content},
         ]
 
-        base = self.valves.model_base_url.rstrip("/")
-        headers = {"Authorization": f"Bearer {self.valves.model_api_key}"}
-
         await _emit(f"subagent 起動 ({mode}): {filename}", False)
         try:
-            async with httpx.AsyncClient(timeout=self.valves.timeout_s) as client:
-                # モデルは live のものを使う (単一モデル運用前提)
-                model = self.valves.subagent_model
-                if not model:
-                    mr = await client.get(f"{base}/models", headers=headers)
-                    mr.raise_for_status()
-                    data = (mr.json() or {}).get("data", [])
-                    if not data:
-                        return {"ok": False, "error": ":8000 に live モデルが無い"}
-                    model = data[0]["id"]
-
-                resp = await client.post(
-                    f"{base}/chat/completions",
-                    headers=headers,
-                    json={
-                        "model": model,
-                        "messages": messages,
-                        "temperature": self.valves.temperature,
-                        "stream": False,
-                    },
-                )
-                resp.raise_for_status()
-                answer = resp.json()["choices"][0]["message"]["content"]
+            answer, model = await self._chat(messages, model=self.valves.subagent_model)
         except httpx.HTTPStatusError as e:
             body = e.response.text[:300]
             hint = ""
@@ -315,14 +425,22 @@ class Tools:
         except Exception as e:
             return {"ok": False, "error": f"推論失敗: {e!r}"}
 
-        await _emit(f"subagent 完了 ({mode}): {filename}", True)
+        messages.append({"role": "assistant", "content": answer})
+        tid = uuid.uuid4().hex
+        try:
+            await self._save_thread(tid, {"model": model, "messages": messages})
+        except Exception as e:
+            return {"ok": False, "error": f"thread 保存失敗 (redis): {e!r}"}
+
+        await _emit(f"subagent 完了 ({mode}): {filename} → {tid}", True)
         result = {
             "ok": True,
             "answer": answer,
+            "thread_id": tid,
             "model": model,
-            "file_id": file_id,
             "filename": filename,
             "mode": mode,
+            "turns": 1,
         }
         if truncated:
             result["truncated"] = True
