@@ -160,10 +160,6 @@ class Tools:
         head_chars: int = Field(
             default=800, description="inspect_artifact が返すプレビュー文字数"
         )
-        redis_url: str = Field(
-            default_factory=lambda: os.getenv("REDIS_URL", "redis://redis:6379/0"),
-            description="会話スレッド置き場の Redis。既定は compose の redis サービス。",
-        )
         thread_ttl_s: int = Field(
             default=3600,
             description="会話スレッドの TTL (秒)。ターン毎に延長 (スライディング)。",

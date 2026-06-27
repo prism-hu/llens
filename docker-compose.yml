@@ -13,36 +13,45 @@ services:
       dockerfile: docker/open-webui/Dockerfile
     container_name: llens-open-webui
     environment:
-      # コンテナ既定は UTC。ログ (loguru) を JST 表示にする。OWUI の保存時刻は
-      # epoch(UTC) なので表示のみ変わり、データには影響しない。
       - TZ=Asia/Tokyo
       - WEBUI_NAME=LLENS
       - OPENAI_API_BASE_URL=http://host.docker.internal:8000/v1
       - OPENAI_API_KEY=EMPTY
+      - ENABLE_API_KEYS=true
       - ENABLE_OLLAMA_API=false
       - ENABLE_VERSION_UPDATE_CHECK=false
       - ENABLE_PERSISTENT_CONFIG=false
       - ENABLE_FOLLOW_UP_GENERATION=false
       - ENABLE_AUTOCOMPLETE_GENERATION=false
       - CONTENT_EXTRACTION_ENGINE=docling
+
+      ##*  Docling関連
       - DOCLING_SERVER_URL=http://docling:5001
       - 'DOCLING_PARAMS={"do_ocr": false}'
       - BYPASS_EMBEDDING_AND_RETRIEVAL=true
       # アップロード許可拡張子 (env 名は RAG_ だが判定はアップロード入口 files.py、RAG 有無と無関係)。
-      # 空だと全拡張子素通り → docling 非対応 (svg 等) や OCR 不可ファイルが null を返し
-      # pydantic ValidationError で処理中断。ここに無い拡張子は入口で 400 で弾く。
-      # docling は do_ocr=false でテキスト埋め込み文書を md 化するだけ。よって画像 (png/jpg 等) は
-      # テキストが取れず null → 同クラッシュになるため除外 (vision 添付は base64 直埋めで別経路、影響なし)。
+      # docling でOCRはしないので (png/jpg 等) は除外, SVGもエラーになるので除外
       - RAG_ALLOWED_FILE_EXTENSIONS=pdf,docx,pptx,xlsx,csv,html,htm,md,markdown,txt,asciidoc,adoc,json,xml,vtt,tex
-      - ENABLE_PIP_INSTALL_FRONTMATTER_REQUIREMENTS=false
-      - ENABLE_EVALUATION_ARENA_MODELS=false
-      - ENABLE_API_KEYS=true
       - 'DEFAULT_PROMPT_SUGGESTIONS=[{"title":["はじめての方へ","LLENSの使い方"],"content":"はじめて使います。何ができるか教えてください。"}]'
+
+
+      ##* ユーザー登録関連
+      - ENABLE_SIGNUP=false
       # 承認待ちオーバーレイ: 管理者の個人情報は出さず、運営チーム窓口を案内
       - SHOW_ADMIN_DETAILS=false
       - PENDING_USER_OVERLAY_TITLE=管理者のアクセス承認待ち
       - "PENDING_USER_OVERLAY_CONTENT=現在あなたは管理者のアクセス承認待ちです。\nLLENSの利用には事前に「PRISM-HU LLENS運営チーム」への連絡が必要です。\n承認は手作業のため、登録から2-3営業日程度頂きます。\n迅速なアクセス承認をご希望の場合は下記までご連絡下さい。\n\nPRISM-HU LLENS運営チーム\nprism-hu-office@pop.med.hokudai.ac.jp / 内線: 5352"
-      # 未使用 UI 機能は閉域運用に合わせて全 OFF
+
+      ##*  STT関連
+      # 音声認識 (STT): OWUI 内蔵 faster-whisper (CPU)。WHISPER_* の詳細・モデル選定・DL は docs/stt.md と README
+      - STT_ENGINE=
+      - WHISPER_MODEL=/models/whisper/faster-whisper-large-v3-turbo-ct2
+      - WHISPER_COMPUTE_TYPE=int8
+      - WHISPER_LANGUAGE=ja
+      - WHISPER_VAD_FILTER=true
+      - WHISPER_MODEL_AUTO_UPDATE=false
+
+      ##*  未使用 UI 機能は閉域運用に合わせて全 OFF
       - ENABLE_COMMUNITY_SHARING=false
       - ENABLE_MESSAGE_RATING=false
       - ENABLE_FOLDERS=false
@@ -52,10 +61,12 @@ services:
       - ENABLE_CALENDAR=false
       - ENABLE_AUTOMATIONS=false
       - ENABLE_USER_WEBHOOKS=false
-      # subagent tool の会話スレッド置き場 (owui/tools/subagent.py が直接叩く)
-      - REDIS_URL=redis://redis:6379/0
+      - ENABLE_PIP_INSTALL_FRONTMATTER_REQUIREMENTS=false
+      - ENABLE_EVALUATION_ARENA_MODELS=false
     volumes:
       - open-webui-data:/app/backend/data
+      # STT モデル (ホスト ./models/whisper を read-only マウント)。SGLang 用 models/ とは別系統。
+      - ./models/whisper:/models/whisper:ro
     ports:
       # Caddy (:80) もしくは開発時はCloudflare Tunnelでアクセス
       - "127.0.0.1:8080:8080"

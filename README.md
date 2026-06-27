@@ -316,6 +316,29 @@ make run-qwen
 
 > DeepSeek V3.2 より更に軽量。speculative decoding (NEXTN) 対応。
 
+### 音声認識 (STT)
+
+OWUI のマイク入力を内蔵 faster-whisper で文字起こし。閉域 + 患者音声のためブラウザ (Chrome) の
+クラウド音声認識は使わずサーバ側で完結させる。CPU 運用 (主推論 H200x8 を汚さない)。
+**モデル選定の比較・理由は [docs/stt.md](docs/stt.md)。**
+
+| 項目 | 値 |
+|---|---|
+| モデル | `large-v3-turbo` (CTranslate2 版) |
+| HF リポジトリ | `deepdml/faster-whisper-large-v3-turbo-ct2` |
+| 実行 | OWUI 内蔵 faster-whisper / CPU / int8 |
+| 言語 | 日本語固定 (`WHISPER_LANGUAGE=ja`) |
+| 設定 | `docker-compose.yml` の open-webui env (`WHISPER_*`) |
+
+```bash
+# ダウンロード (搬入前・オンライン中に必須。閉域では取得不可)
+uv run hf download deepdml/faster-whisper-large-v3-turbo-ct2 \
+  --local-dir ./models/whisper/faster-whisper-large-v3-turbo-ct2
+```
+
+> `./models/whisper` は compose で OWUI コンテナへ read-only マウントされる。DL を忘れると
+> 起動時にオフライン読み込みに失敗し STT が無言で落ちるため、搬入前チェックに含めること。
+
 ## 監視
 
 SGLang 側は `--enable-metrics` 付きで起動する。
