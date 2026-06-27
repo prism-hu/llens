@@ -3,3 +3,6 @@ datasets/
 
 # Run outputs
 results/
+
+# STT ベンチの使い捨て音声
+stt/samples/
