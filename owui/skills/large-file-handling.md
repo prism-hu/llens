@@ -1,5 +1,5 @@
 ---
-name: large-file-handling
+title: Large File Handling
 description: "巨大な添付ファイルを、中身を主コンテキストに展開せずに処理するためのワークフロー。large-file-gate filter が『本文を context に入れていない (file_id=… で取得可)』というシステム指示を出した時、または巨大な CSV/Excel/PDF/ログ等を『全文を会話に出さずに』集計・要約・抽出したい時に起動する。tool と Pyodide (Code Interpreter) を併用する: Pyodide で file_id から raw / docling md を取り戻し、サイズを見て戦略的に削る or 分割し、harvest で file_id 化してから ask_subagent (subagent tool) に渡して結果だけ受け取る。中身そのものは print せず、メタ情報 (サイズ・shape・列名) と file_id だけを扱う。電子カルテ系 CSV は cp932 のことが多い。"
 ---
 

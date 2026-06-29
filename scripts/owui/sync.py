@@ -15,7 +15,7 @@ update では is_active を OWUI 側の現状から echo して維持し、acces
 
 filter/tool と skill で差異:
   - id: filter/tool は filename stem。skill は frontmatter `name` (hyphen スラグ。OWUI の
-        skill id は hyphen 規約)。表示 name は frontmatter `title` か、無ければスラグの title-case。
+        skill id は hyphen 規約)。表示 name は frontmatter `title` か、無ければ id を title-case。
   - frontmatter: filter/tool は先頭 Python docstring、skill は YAML (---...---)。
   - payload: filter/tool は meta.description。skill は name/description/content/is_active が
              トップレベル (SkillForm)。content は両者ともファイル全文 (skill も frontmatter 込み)。
@@ -134,6 +134,9 @@ def build_skill_payload(path: pathlib.Path, content: str) -> tuple[str, dict]:
     is_active はここでは True (create 用)。update 時は呼び出し側で現状を echo する。"""
     fm = parse_md_frontmatter(content)
     skill_id = (fm.get("name") or path.stem.replace("_", "-")).strip()
+    # 表示 name は frontmatter title 優先、無ければ id(kebab) を title-case
+    # (large-file-handling→"Large File Handling")。TDM/IRB 等の頭字語は title-case が
+    # 崩す (→"Tdm"/"Irb") ので、その skill だけ frontmatter に title を明示する。
     name = fm.get("title") or skill_id.replace("-", " ").title()
     body = {
         "id": skill_id,
@@ -201,11 +204,6 @@ def sync_one(
             try:
                 cur = json.loads(get_text)
                 body = {**body, "is_active": cur.get("is_active", True)}
-                # 表示 name は frontmatter に明示 title が無ければスラグの title-case になり、
-                # OWUI 側の curated 名 (例 "Vancomycin TDM") を "Vancomycin Tdm" に退行させる。
-                # title 明示が無いときは既存名を維持する (active/access と同じ「現状尊重」)。
-                if "title" not in parse_md_frontmatter(content) and cur.get("name"):
-                    body["name"] = cur["name"]
             except Exception:
                 pass
         status, text = http_request(

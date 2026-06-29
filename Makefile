@@ -18,7 +18,7 @@ help:
 	@echo "  make preflight-scan    - ClamAV 全体スキャン (シャットダウン直前)"
 	@echo ""
 	@echo "Open WebUI:"
-	@echo "  make owui-sync         - owui/filters/ + owui/tools/ を OWUI に同期 (.env の OWUI_API_KEY 必要)"
+	@echo "  make owui-sync         - owui/filters/ + owui/tools/ + owui/skills/ を OWUI に同期 (.env の OWUI_API_KEY 必要)"
 	@echo ""
 	@echo "ログ出力先: logs/"
 

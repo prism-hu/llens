@@ -1,5 +1,5 @@
 ---
-name: medical-calculator
+title: Medical Calculator
 description: "臨床で頻用される医学計算・スコアリングのtool群 (`calc_*`) の使い方をまとめる。eGFR、CCr、MELD-Na、ALBI、FIB-4、APACHE II、Glasgow-Blatchford、Ranson、DIC (ISTH/厚労省)、酸塩基統合解析の10関数を提供する。利用者からの相談で計算・スコアリングが必要になった時、自前の暗算ではなく必ず本tool群を使うこと。BMI、BSA、補正Ca、A-aDO2 等の単純な式は本tool群には含まれない (内部の算術で計算する)。"
 ---
 

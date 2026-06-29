@@ -1,5 +1,5 @@
 ---
-name: evaluation-scales
+title: Evaluation Scales
 description: "臨床評価スケール・治療効果判定規準の定義と閾値を「その場で引く」ためのリファレンス。ECOG PS、Karnofsky PS (KPS)、mMRC 息切れスケール、RECIST 1.1 (固形がん効果判定) の各グレード定義・カットオフ値を収録。利用者が PS / ECOG / Karnofsky / KPS / mMRC / RECIST / 奏効 / CR・PR・SD・PD / 標的病変 等に言及した時、または各スケールのグレード定義・閾値・判定区分を確認したい時に参照する。tool も Pyodide も使わず定義の引用のみを行う (患者データからの自動グレーディング・SOD 計算はしない)。数値・定義をうろ覚えで答えず必ず本SKILLの値を引くこと。"
 ---
 

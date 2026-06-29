@@ -1,5 +1,5 @@
 ---
-name: vancomycin-tdm
+title: Vancomycin TDM
 description: "バンコマイシン血中濃度モニタリング (TDM) における AUC₂₄推定、濃度-時間曲線の可視化、用量調整提案のワークフロー。利用者から「バンコマイシン TDM」「バンコの濃度評価」「ピーク/トラフ」「AUC₂₄」「バンコの投与量どうしよう」等の相談を受けた時に起動する。tool は使わず、Pyodide (Code Interpreter) で計算・プロットを行う。北大病院では薬剤部のTDM支援サービスが標準窓口であり、本SKILLは初期評価・教育・What-if検討の補助に位置づける。"
 ---
 
